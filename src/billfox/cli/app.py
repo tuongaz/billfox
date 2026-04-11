@@ -41,6 +41,32 @@ app: Any = typer.Typer(
 )
 
 
+def _make_progress_callback() -> Any:
+    """Create a progress callback for CLI commands, or None if not a TTY."""
+    if not sys.stdout.isatty():
+        return None
+
+    from rich.console import Console
+
+    from billfox._progress import ProgressEvent, Status
+
+    console = Console(stderr=True)
+
+    async def _on_progress(event: ProgressEvent) -> None:
+        stage_name = event.stage.value.lower()
+        if event.status == Status.STARTED:
+            console.print(f"[bold blue]{stage_name}[/bold blue]...", highlight=False)
+        elif event.status == Status.COMPLETED:
+            console.print(f"[bold blue]{stage_name}[/bold blue] [green]done[/green]", highlight=False)
+        elif event.status == Status.FAILED:
+            console.print(
+                f"[bold blue]{stage_name}[/bold blue] [red]{event.message}[/red]",
+                highlight=False,
+            )
+
+    return _on_progress
+
+
 def _build_preprocessors(preprocess: str | None, api_key: str | None = None) -> list[Any]:
     """Build preprocessor list from comma-separated string."""
     if not preprocess:
@@ -125,17 +151,45 @@ def extract(
 
         logging.basicConfig(level=logging.DEBUG)
 
+    on_progress = _make_progress_callback()
+
     async def _run() -> str:
+        from billfox._progress import ProgressEvent, Stage, Status
         from billfox.source.local import LocalFileSource
+
+        async def _emit(stage: Stage, status: Status, **kwargs: Any) -> None:
+            if on_progress is not None:
+                await on_progress(ProgressEvent(stage=stage, status=status, **kwargs))
 
         source = LocalFileSource()
         ext = _build_extractor(extractor, api_key)
         preprocessors = _build_preprocessors(preprocess)
 
-        document = await source.load(file)
+        try:
+            await _emit(Stage.LOADING, Status.STARTED)
+            document = await source.load(file)
+            await _emit(Stage.LOADING, Status.COMPLETED)
+        except Exception as e:
+            await _emit(Stage.LOADING, Status.FAILED, message=str(e))
+            raise
+
         for pp in preprocessors:
-            document = await pp.process(document)
-        result = await ext.extract(document)
+            try:
+                await _emit(Stage.PREPROCESSING, Status.STARTED, message=type(pp).__name__)
+                document = await pp.process(document)
+                await _emit(Stage.PREPROCESSING, Status.COMPLETED)
+            except Exception as e:
+                await _emit(Stage.PREPROCESSING, Status.FAILED, message=str(e))
+                raise
+
+        try:
+            await _emit(Stage.EXTRACTING, Status.STARTED)
+            result = await ext.extract(document)
+            await _emit(Stage.EXTRACTING, Status.COMPLETED, metadata={"pages": len(result.pages)})
+        except Exception as e:
+            await _emit(Stage.EXTRACTING, Status.FAILED, message=str(e))
+            raise
+
         return str(result.markdown)
 
     try:
@@ -184,6 +238,7 @@ def parse(
         logging.basicConfig(level=logging.DEBUG)
 
     schema_cls = _load_schema(schema)
+    on_progress = _make_progress_callback()
 
     async def _run() -> Any:
         from billfox.parse.llm import LLMParser
@@ -214,6 +269,7 @@ def parse(
             parser=parser,
             preprocessors=preprocessors,
             store=store_instance,
+            on_progress=on_progress,
         )
 
         doc_id = Path(file).stem if store else None
