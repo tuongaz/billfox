@@ -1,0 +1,310 @@
+{
+  "project": "Billfox OSS Library",
+  "branchName": "ralph/billfox-oss-library",
+  "description": "Open-source Python library for composable document data extraction: load, preprocess, OCR, LLM parse, store with vector search. Published as `billfox` on PyPI with a `billfox` CLI.",
+  "referenceCodebase": {
+    "path": "../billfox-app/api/src",
+    "instruction": "You MUST reference the existing codebase at ../billfox-app/api/src for implementation inspiration. This codebase contains proven patterns and working code that should be ported/adapted into this new library. Always read and understand the relevant source files before implementing each user story. Key directories to reference: ai/ (AI agents, YOLO, embeddings), store/ (SQLite, search pipeline, vector types), utils/ (storage, helpers), pipelines/ (pipeline patterns), models/ (data models), schemas/ (Pydantic schemas)."
+  },
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Project scaffold and core types",
+      "description": "As a developer, I need the project scaffolded with pyproject.toml, core types, and all protocol definitions so every subsequent module has a foundation.",
+      "acceptanceCriteria": [
+        "New repository initialised with src/billfox/ layout",
+        "pyproject.toml uses hatch build backend, package name 'billfox', requires-python >=3.11",
+        "Core dependency is only pydantic>=2.0",
+        "Optional extras defined: mistral, yolo, llm, openai, store, cli, all, dev",
+        "_version.py with version 0.1.0",
+        "py.typed PEP 561 marker file present",
+        "_types.py defines Document, Page, ExtractionResult, SearchResult as frozen dataclasses",
+        "source/_base.py defines DocumentSource protocol with async load(uri) -> Document",
+        "preprocess/_base.py defines Preprocessor protocol with async process(doc) -> Document",
+        "extract/_base.py defines Extractor protocol with async extract(doc) -> ExtractionResult",
+        "parse/_base.py defines Parser[T] protocol with async parse(markdown) -> T",
+        "embed/_base.py defines Embedder protocol with async embed(texts) -> list[list[float]] and dimensions property",
+        "store/_base.py defines DocumentStore[T] protocol with save/get/search/delete methods",
+        "All protocols are @runtime_checkable",
+        "Each subpackage has __init__.py re-exporting public names",
+        "billfox/__init__.py re-exports Pipeline, Document, ExtractionResult, SearchResult",
+        "Makefile with targets: test, lint, format, typecheck",
+        "ruff and mypy config in pyproject.toml",
+        "LICENSE (MIT), CHANGELOG.md, CONTRIBUTING.md present",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Foundation for all other stories. No external dependencies beyond pydantic."
+    },
+    {
+      "id": "US-002",
+      "title": "Source module — local file loading",
+      "description": "As a library consumer, I want to load documents from the local filesystem so I can process images and PDFs.",
+      "acceptanceCriteria": [
+        "source/local.py implements LocalFileSource matching DocumentSource protocol",
+        "load(uri) reads file bytes and detects MIME type from file extension",
+        "Supported MIME types: image/jpeg, image/png, image/webp, image/tiff, image/heic, application/pdf",
+        "Returns Document(content=bytes, mime_type=str, source_uri=str, metadata={})",
+        "Raises FileNotFoundError for missing files",
+        "Raises ValueError for unsupported MIME types",
+        "Unit tests cover: valid image, valid PDF, missing file, unsupported extension",
+        "Typecheck passes"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Simple module. Reference Billfox pattern: api/src/utils/storage.py for file loading."
+    },
+    {
+      "id": "US-003",
+      "title": "Preprocessing — YOLO document cropping",
+      "description": "As a library consumer, I want to crop documents using YOLO object detection so OCR accuracy improves.",
+      "acceptanceCriteria": [
+        "preprocess/yolo.py implements YOLOPreprocessor matching Preprocessor protocol",
+        "Constructor accepts model_path: str for user-provided ONNX model",
+        "Uses ONNX Runtime for inference (lazy-imported with clear error if missing)",
+        "Ported from api/src/ai/yolo/receipt_onnx.py: _preprocess, _postprocess, _nms, _compute_iou, _compute_containment, crop_detections_onnx",
+        "Renamed from receipt-specific to generic document naming",
+        "process(document) returns new Document with cropped image bytes",
+        "If no detections found, returns original document unchanged",
+        "Only processes image MIME types; passes PDFs through unchanged",
+        "Configurable confidence threshold (default 0.25) and image size (default 640)",
+        "Unit tests with mocked ONNX session",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Port from api/src/ai/yolo/receipt_onnx.py. Rename receipt→document. Accept user model path."
+    },
+    {
+      "id": "US-004",
+      "title": "Preprocessing — resize and chain",
+      "description": "As a library consumer, I want to resize images and chain multiple preprocessors for flexible preprocessing pipelines.",
+      "acceptanceCriteria": [
+        "preprocess/resize.py implements ResizePreprocessor matching Preprocessor protocol",
+        "Accepts max_side: int (default 1024), maintains aspect ratio",
+        "Ported from api/src/ai/yolo/image.py: resize_keep_aspect logic",
+        "Only processes image MIME types; passes PDFs through unchanged",
+        "preprocess/chain.py implements PreprocessorChain matching Preprocessor protocol",
+        "Accepts preprocessors: list[Preprocessor], applies them sequentially",
+        "Unit tests for resize (aspect ratio preserved, max dimension respected)",
+        "Unit tests for chain (order matters, empty chain returns original)",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Port resize from api/src/ai/yolo/image.py. Chain is new composition utility."
+    },
+    {
+      "id": "US-005",
+      "title": "Extraction — Mistral OCR",
+      "description": "As a library consumer, I want to convert images and PDFs to markdown using Mistral OCR API.",
+      "acceptanceCriteria": [
+        "extract/mistral.py implements MistralExtractor matching Extractor protocol",
+        "Constructor accepts optional api_key and model (default mistral-ocr-latest)",
+        "Falls back to MISTRAL_API_KEY env var if no api_key provided",
+        "Raises clear RuntimeError if no API key available",
+        "Ported from api/src/ai/agents/expense/mistral.py: to_data_url, validate_mime, OCR call logic",
+        "Correctly branches image_url vs document_url based on MIME type",
+        "Returns ExtractionResult(markdown=str, pages=list[Page], metadata={})",
+        "mistralai is lazy-imported with clear install instructions on ImportError",
+        "Unit tests with mocked Mistral client (verify request format, response parsing)",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Port from api/src/ai/agents/expense/mistral.py. Key detail: image_url vs document_url branching."
+    },
+    {
+      "id": "US-006",
+      "title": "Parsing — LLM structured extraction",
+      "description": "As a library consumer, I want to parse markdown into any Pydantic model using an LLM.",
+      "acceptanceCriteria": [
+        "parse/llm.py implements LLMParser[T] matching Parser[T] protocol",
+        "Constructor accepts: model (str like 'openai:gpt-4.1'), output_type (type[T] any Pydantic BaseModel), system_prompt (str), optional retries (default 1)",
+        "Uses pydantic-ai Agent under the hood with structured output",
+        "parse(markdown) returns an instance of T",
+        "pydantic-ai is lazy-imported with clear install instructions on ImportError",
+        "Works with any LLM provider supported by pydantic-ai",
+        "Unit tests with mocked pydantic-ai agent",
+        "Test with a sample Pydantic model (e.g. Invoice with vendor_name, total, date)",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Generic wrapper around pydantic-ai. User provides output_type and system_prompt."
+    },
+    {
+      "id": "US-007",
+      "title": "Pipeline compositor",
+      "description": "As a library consumer, I want to wire all stages together in a single Pipeline for end-to-end document processing.",
+      "acceptanceCriteria": [
+        "pipeline.py implements Pipeline[T] as a generic dataclass",
+        "Constructor accepts: source, extractor, parser, optional preprocessors list, optional store",
+        "run(uri, document_id=None) executes: load -> preprocess -> extract -> parse -> store -> return T",
+        "extract_only(uri) executes: load -> preprocess -> extract -> return ExtractionResult",
+        "Pipeline works without preprocessors (empty list)",
+        "Pipeline works without store (store=None)",
+        "Store only called when both store and document_id are provided",
+        "Integration tests with all stages mocked, verifying call order",
+        "Test extract_only skips parse and store",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Composes all modules. Each stage is independently swappable."
+    },
+    {
+      "id": "US-008",
+      "title": "Embedding module — OpenAI",
+      "description": "As a library consumer, I want to generate text embeddings using OpenAI for semantic search.",
+      "acceptanceCriteria": [
+        "embed/openai.py implements OpenAIEmbedder matching Embedder protocol",
+        "Constructor accepts optional api_key and model (default text-embedding-3-small)",
+        "Falls back to OPENAI_API_KEY env var",
+        "embed(texts) returns list[list[float]] — one embedding per input text",
+        "dimensions property returns 1536 for text-embedding-3-small",
+        "Parallel embedding generation via asyncio.gather",
+        "Includes encode_vector and decode_vector utility functions (base64 float packing)",
+        "openai is lazy-imported with clear install instructions on ImportError",
+        "Unit tests with mocked OpenAI client",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Port from api/src/ai/embeddings.py. Wrap in Embedder protocol."
+    },
+    {
+      "id": "US-009",
+      "title": "Storage — SQLite schema and CRUD",
+      "description": "As a library consumer, I want to store extracted data in SQLite so I can persist and retrieve documents.",
+      "acceptanceCriteria": [
+        "store/_schema.py defines SQLAlchemy models: documents table (id, schema_name, data_json, source_uri, raw_markdown, created_at, updated_at)",
+        "store/_schema.py defines document_embeddings table (id, document_id FK, field_name, text_content, UNIQUE on document_id+field_name)",
+        "store/_vector.py implements VectorType (SQLite-only: LargeBinary with float32 struct packing)",
+        "Ported from api/src/store/column_types.py — SQLite branches only, drop PostgreSQL",
+        "store/sqlite.py implements SQLiteDocumentStore[T] matching DocumentStore[T] protocol",
+        "Constructor accepts: db_path, schema (type[T]), optional embedder, optional embed_fields",
+        "Auto-creates tables on first use (including sqlite-vec virtual table and FTS5 table)",
+        "SQLite WAL mode, foreign keys ON, busy_timeout=5000 configured",
+        "sqlite-vec loaded via sqlite_vec.load() with graceful fallback if unavailable",
+        "save(document_id, data) stores Pydantic model as JSON, syncs embeddings to virtual tables",
+        "get(document_id) deserialises JSON back to Pydantic model, returns None if not found",
+        "delete(document_id) cascades to embeddings",
+        "sqlalchemy, aiosqlite, sqlite-vec lazy-imported with clear error messages",
+        "Integration tests with in-memory SQLite: save, get, delete round-trip",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Port VectorType from api/src/store/column_types.py (SQLite-only). Port sqlite-vec setup from api/src/store/db.py."
+    },
+    {
+      "id": "US-010",
+      "title": "Storage — hybrid search",
+      "description": "As a library consumer, I want to search stored documents using hybrid BM25 + vector search with RRF fusion.",
+      "acceptanceCriteria": [
+        "store/_search.py implements hybrid search pipeline",
+        "BM25 search via FTS5 virtual table returning (document_id, bm25_score) tuples",
+        "Vector KNN search via sqlite-vec returning (document_id, cosine_similarity) tuples",
+        "normalize_scores() function ported directly from api/src/store/search_pipeline.py",
+        "apply_hybrid_fusion() function ported directly — 60% normalised + 40% RRF (k=60)",
+        "Tie-breaking by created_at recency",
+        "SearchResult includes signals dict for explainability (bm25, vector, rrf, final scores)",
+        "search(query, limit=20) on SQLiteDocumentStore performs hybrid search",
+        "If embedder available: runs both BM25 + vector signals",
+        "If no embedder: falls back to BM25-only search",
+        "sqlite_vec_knn_search helper ported from api/src/store/search.py",
+        "sync_vector_to_virtual_table helper ported from api/src/store/search.py",
+        "Integration tests with in-memory SQLite: store documents, search, verify ranking",
+        "Typecheck passes"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Port from api/src/store/search_pipeline.py (normalize_scores, apply_hybrid_fusion) and api/src/store/search.py (sqlite_vec_knn_search). Generalise from expense-specific to generic."
+    },
+    {
+      "id": "US-011",
+      "title": "CLI — extract and parse commands",
+      "description": "As a CLI user, I want billfox extract and billfox parse commands to process documents from the terminal.",
+      "acceptanceCriteria": [
+        "cli/app.py implements Typer application",
+        "cli/__main__.py enables python -m billfox",
+        "pyproject.toml registers billfox script entry point: billfox = billfox.cli:app",
+        "billfox extract <file> runs OCR and outputs markdown to stdout or --output file",
+        "extract flags: --extractor (default mistral), --preprocess (comma-separated), --api-key",
+        "billfox parse <file> runs full pipeline and outputs JSON to stdout or --output file",
+        "parse flags: --schema (path:ClassName), --model (default openai:gpt-4.1), --prompt, --store (db path), --preprocess",
+        "--schema dynamically loads Pydantic model from Python file using importlib",
+        "--json flag outputs machine-readable JSON",
+        "--verbose flag enables debug output",
+        "billfox --help and billfox extract --help work correctly",
+        "typer and rich lazy-imported with clear error messages",
+        "Unit tests using Typer test runner for extract and parse commands",
+        "Typecheck passes"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": "CLI entry point is 'billfox'. Dynamic schema loading via importlib."
+    },
+    {
+      "id": "US-012",
+      "title": "CLI — search and config commands",
+      "description": "As a CLI user, I want billfox search and billfox config commands to query stored documents and manage settings.",
+      "acceptanceCriteria": [
+        "billfox search <query> searches stored documents",
+        "search flags: --db (required), --limit (default 20), --mode (hybrid/vector/bm25), --json",
+        "Search results displayed as formatted table (rich) or JSON with --json flag",
+        "billfox config set <key> <value> writes to ~/.billfox/config.toml",
+        "billfox config get <key> reads from config file",
+        "billfox config list shows all config values",
+        "Config supports api_keys.mistral, api_keys.openai, default extractor, default model",
+        "Config directory auto-created if missing",
+        "billfox search --help and billfox config --help work",
+        "Unit tests for search and config commands",
+        "Typecheck passes"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": "Config stored at ~/.billfox/config.toml. Uses tomllib (stdlib) for reading, tomli-w for writing."
+    },
+    {
+      "id": "US-013",
+      "title": "Documentation and README",
+      "description": "As a developer evaluating the library, I want clear documentation so I can understand and adopt billfox quickly.",
+      "acceptanceCriteria": [
+        "README.md with: badges, one-line description, install instructions, 3 quick-start examples (OCR-only, full pipeline, CLI), architecture diagram (ASCII), link to docs",
+        "docs/ directory with mkdocs-material config (mkdocs.yml)",
+        "Docs pages: getting-started.md, custom-extractor.md, custom-preprocessor.md, storage-and-search.md",
+        "CONTRIBUTING.md with dev setup, running tests, code style, PR process",
+        "CHANGELOG.md with v0.1.0 entry listing all features",
+        "All public APIs have docstrings",
+        "Typecheck passes"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": "Focus on practical examples. Architecture diagram should show the pipeline stages."
+    },
+    {
+      "id": "US-014",
+      "title": "CI and integration verification",
+      "description": "As a developer, I want CI and integration tests to verify the full pipeline works correctly.",
+      "acceptanceCriteria": [
+        ".github/workflows/ci.yml for Python 3.11, 3.12, 3.13 test matrix",
+        "CI runs: pytest, mypy --strict, ruff check",
+        "Integration test: full pipeline with mocked LLM + mocked OCR + real in-memory SQLite",
+        "Integration test: extract_only flow (source -> preprocess -> extract)",
+        "Integration test: store -> search round-trip with synthetic embeddings",
+        "Integration test: hybrid search returns results ranked by RRF fusion",
+        "Import isolation test: import billfox works with only pydantic installed",
+        "Extras isolation test: importing billfox.extract.mistral without mistralai gives clear ImportError",
+        "CLI smoke test: billfox --help exits 0",
+        "All tests pass across Python 3.11/3.12/3.13",
+        "Typecheck passes"
+      ],
+      "priority": 14,
+      "passes": false,
+      "notes": "Final verification story. All previous stories must pass before this one."
+    }
+  ]
+}
