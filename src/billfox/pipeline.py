@@ -96,9 +96,36 @@ class Pipeline(Generic[T]):
 
     async def extract_only(self, uri: str) -> ExtractionResult:
         """Execute load -> preprocess -> extract only (no parse or store)."""
-        document = await self.source.load(uri)
-        document = await self._preprocess(document)
-        return await self.extractor.extract(document)
+        # LOADING
+        try:
+            await self._emit(Stage.LOADING, Status.STARTED)
+            document = await self.source.load(uri)
+            await self._emit(Stage.LOADING, Status.COMPLETED)
+        except Exception as exc:
+            await self._emit(Stage.LOADING, Status.FAILED, message=str(exc))
+            raise
+
+        # PREPROCESSING
+        if self.preprocessors:
+            try:
+                for p in self.preprocessors:
+                    await self._emit(Stage.PREPROCESSING, Status.STARTED, message=type(p).__name__)
+                document = await self._preprocess(document)
+                await self._emit(Stage.PREPROCESSING, Status.COMPLETED)
+            except Exception as exc:
+                await self._emit(Stage.PREPROCESSING, Status.FAILED, message=str(exc))
+                raise
+
+        # EXTRACTING
+        try:
+            await self._emit(Stage.EXTRACTING, Status.STARTED)
+            result = await self.extractor.extract(document)
+            await self._emit(Stage.EXTRACTING, Status.COMPLETED, metadata={"pages": len(result.pages)})
+        except Exception as exc:
+            await self._emit(Stage.EXTRACTING, Status.FAILED, message=str(exc))
+            raise
+
+        return result
 
     async def _preprocess(self, document: Document) -> Document:
         for preprocessor in self.preprocessors:
