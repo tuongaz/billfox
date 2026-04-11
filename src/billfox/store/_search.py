@@ -239,11 +239,15 @@ async def hybrid_search(
     embedder: Any | None = None,
     sqlite_vec_available: bool = False,
     limit: int = 20,
+    mode: str = "hybrid",
 ) -> list[tuple[str, dict[str, float]]]:
     """Run hybrid BM25 + vector search with RRF fusion.
 
-    If an embedder is available and sqlite-vec is loaded, runs both BM25 and
-    vector signals.  Otherwise falls back to BM25-only.
+    *mode* controls which signals are used:
+
+    - ``"hybrid"`` (default): BM25 + vector, fused with RRF.
+    - ``"bm25"``: BM25 full-text search only.
+    - ``"vector"``: Vector KNN search only.
 
     Returns list of (document_id, signals) sorted by fused score, limited to
     *limit* results.
@@ -251,19 +255,20 @@ async def hybrid_search(
     candidate_map: dict[str, SearchCandidate] = {}
 
     # --- BM25 signal ---
-    try:
-        bm25_results = await bm25_search(session, query, limit=limit * 5)
-    except Exception as exc:
-        logger.debug("BM25 search failed: %s", exc)
-        bm25_results = []
+    if mode in ("hybrid", "bm25"):
+        try:
+            bm25_results = await bm25_search(session, query, limit=limit * 5)
+        except Exception as exc:
+            logger.debug("BM25 search failed: %s", exc)
+            bm25_results = []
 
-    for doc_id, score in bm25_results:
-        if doc_id not in candidate_map:
-            candidate_map[doc_id] = SearchCandidate(document_id=doc_id)
-        candidate_map[doc_id].signals["bm25"] = score
+        for doc_id, score in bm25_results:
+            if doc_id not in candidate_map:
+                candidate_map[doc_id] = SearchCandidate(document_id=doc_id)
+            candidate_map[doc_id].signals["bm25"] = score
 
     # --- Vector signal ---
-    if embedder is not None and sqlite_vec_available:
+    if mode in ("hybrid", "vector") and embedder is not None and sqlite_vec_available:
         try:
             vectors = await embedder.embed([query])
             if vectors:

@@ -4,6 +4,7 @@ import asyncio
 import importlib.util
 import json
 import sys
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -237,3 +238,261 @@ def parse(
     else:
         sys.stdout.write(output_text)
         sys.stdout.write("\n")
+
+
+# ── Config helpers ──────────────────────────────────────────────
+
+
+def _get_config_dir() -> Path:
+    """Return the billfox config directory (~/.billfox)."""
+    return Path.home() / ".billfox"
+
+
+def _get_config_file() -> Path:
+    """Return the billfox config file path."""
+    return _get_config_dir() / "config.toml"
+
+
+def _read_config() -> dict[str, Any]:
+    """Read config from ~/.billfox/config.toml."""
+    config_file = _get_config_file()
+    if not config_file.exists():
+        return {}
+    with open(config_file, "rb") as f:
+        return tomllib.load(f)
+
+
+def _lazy_tomli_w() -> Any:
+    """Lazily import tomli_w with clear error message."""
+    try:
+        import tomli_w
+    except ImportError:
+        raise ImportError(
+            "tomli-w is required for writing configuration. "
+            "Install it with: pip install 'billfox[cli]'"
+        ) from None
+    return tomli_w
+
+
+def _write_config(config: dict[str, Any]) -> None:
+    """Write config to ~/.billfox/config.toml."""
+    tw = _lazy_tomli_w()
+    config_dir = _get_config_dir()
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "config.toml"
+    with open(config_file, "wb") as f:
+        tw.dump(config, f)
+
+
+def _get_nested(config: dict[str, Any], key: str) -> Any:
+    """Get a nested value from config using dot-separated key."""
+    parts = key.split(".")
+    current: Any = config
+    for part in parts:
+        if not isinstance(current, dict) or part not in current:
+            return None
+        current = current[part]
+    return current
+
+
+def _set_nested(config: dict[str, Any], key: str, value: str) -> None:
+    """Set a nested value in config using dot-separated key."""
+    parts = key.split(".")
+    current: Any = config
+    for part in parts[:-1]:
+        if part not in current or not isinstance(current[part], dict):
+            current[part] = {}
+        current = current[part]
+    current[parts[-1]] = value
+
+
+def _flatten_config(
+    config: dict[str, Any], prefix: str = "",
+) -> list[tuple[str, str]]:
+    """Flatten a nested config dict into (dotted_key, value) pairs."""
+    items: list[tuple[str, str]] = []
+    for key, value in config.items():
+        full_key = f"{prefix}.{key}" if prefix else key
+        if isinstance(value, dict):
+            items.extend(_flatten_config(value, full_key))
+        else:
+            items.append((full_key, str(value)))
+    return items
+
+
+# ── Config sub-app ──────────────────────────────────────────────
+
+config_app: Any = typer.Typer(
+    name="config",
+    help="Manage billfox configuration.",
+    no_args_is_help=True,
+)
+app.add_typer(config_app)
+
+
+@config_app.command("set")  # type: ignore[untyped-decorator]
+def config_set(
+    key: str = typer.Argument(..., help="Config key (e.g. api_keys.mistral)."),
+    value: str = typer.Argument(..., help="Config value."),
+) -> None:
+    """Set a configuration value."""
+    config = _read_config()
+    _set_nested(config, key, value)
+    _write_config(config)
+    rprint = _lazy_rich_print()
+    rprint(f"[green]Set {key} = {value}[/green]")
+
+
+@config_app.command("get")  # type: ignore[untyped-decorator]
+def config_get(
+    key: str = typer.Argument(..., help="Config key (e.g. api_keys.mistral)."),
+) -> None:
+    """Get a configuration value."""
+    config = _read_config()
+    val = _get_nested(config, key)
+    if val is None:
+        rprint = _lazy_rich_print()
+        rprint(f"[yellow]Key {key!r} not set[/yellow]")
+        raise typer.Exit(code=1)
+    typer.echo(val)
+
+
+@config_app.command("list")  # type: ignore[untyped-decorator]
+def config_list() -> None:
+    """List all configuration values."""
+    config = _read_config()
+    if not config:
+        rprint = _lazy_rich_print()
+        rprint("[yellow]No configuration set.[/yellow]")
+        return
+    rprint = _lazy_rich_print()
+    for k, v in _flatten_config(config):
+        rprint(f"[bold]{k}[/bold] = {v}")
+
+
+# ── Search helpers ──────────────────────────────────────────────
+
+
+def _try_build_embedder() -> Any:
+    """Try to build an OpenAI embedder from env or config."""
+    import os
+
+    api_key = os.environ.get("OPENAI_API_KEY")
+    if not api_key:
+        config = _read_config()
+        api_key_val = _get_nested(config, "api_keys.openai")
+        if isinstance(api_key_val, str):
+            api_key = api_key_val
+    if api_key:
+        try:
+            from billfox.embed.openai import OpenAIEmbedder
+
+            return OpenAIEmbedder(api_key=api_key)
+        except ImportError:
+            return None
+    return None
+
+
+def _display_search_results(results: list[Any]) -> None:
+    """Display search results as a formatted rich table."""
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        if not results:
+            sys.stdout.write("No results found.\n")
+            return
+        for i, r in enumerate(results, 1):
+            sys.stdout.write(
+                f"{i}. {r.document_id} (score: {r.score:.4f})\n"
+            )
+        return
+
+    console = Console()
+    if not results:
+        console.print("[yellow]No results found.[/yellow]")
+        return
+
+    table = Table(title="Search Results")
+    table.add_column("Rank", style="dim")
+    table.add_column("Document ID", style="bold")
+    table.add_column("Score", justify="right")
+    table.add_column("Data")
+
+    for i, r in enumerate(results, 1):
+        data_str = json.dumps(r.data, default=str)
+        if len(data_str) > 80:
+            data_str = data_str[:77] + "..."
+        table.add_row(str(i), r.document_id, f"{r.score:.4f}", data_str)
+
+    console.print(table)
+
+
+# ── Search command ──────────────────────────────────────────────
+
+
+@app.command()  # type: ignore[untyped-decorator]
+def search(
+    query: str = typer.Argument(..., help="Search query."),
+    db: str = typer.Option(..., "--db", "-d", help="SQLite database path."),
+    limit: int = typer.Option(20, "--limit", "-l", help="Maximum number of results."),
+    mode: str = typer.Option(
+        "hybrid", "--mode", "-m", help="Search mode: hybrid, vector, or bm25.",
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
+) -> None:
+    """Search stored documents."""
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    if mode not in ("hybrid", "vector", "bm25"):
+        raise typer.BadParameter(
+            f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
+        )
+
+    async def _run() -> list[Any]:
+        from pydantic import BaseModel as _BaseModel
+        from pydantic import ConfigDict
+
+        from billfox.store.sqlite import SQLiteDocumentStore
+
+        class _AnyModel(_BaseModel):
+            model_config = ConfigDict(extra="allow")
+
+        embedder = _try_build_embedder()
+
+        store_instance: Any = SQLiteDocumentStore(
+            db_path=db,
+            schema=_AnyModel,
+            embedder=embedder,
+        )
+        return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
+
+    try:
+        results = asyncio.run(_run())
+    except Exception as e:
+        rprint = _lazy_rich_print()
+        rprint(f"[red]Error:[/red] {e}")
+        raise typer.Exit(code=1) from None
+
+    if json_output:
+        output_text = json.dumps(
+            [
+                {
+                    "document_id": r.document_id,
+                    "score": r.score,
+                    "data": r.data,
+                    "signals": dict(r.signals),
+                }
+                for r in results
+            ],
+            indent=2,
+            default=str,
+        )
+        sys.stdout.write(output_text)
+        sys.stdout.write("\n")
+    else:
+        _display_search_results(results)

@@ -137,11 +137,11 @@ class SQLiteDocumentStore(Generic[T]):
                 return None
             return self._schema.model_validate_json(row.data_json)
 
-    async def search(self, query: str, *, limit: int = 20) -> list[SearchResult]:
+    async def search(self, query: str, *, limit: int = 20, mode: str = "hybrid") -> list[SearchResult]:
         """Hybrid BM25 + vector search with RRF fusion.
 
-        If an embedder is available and sqlite-vec is loaded, runs both BM25
-        and vector signals.  Otherwise falls back to BM25-only.
+        *mode* controls which signals are used: ``"hybrid"`` (default),
+        ``"bm25"``, or ``"vector"``.
         """
         await self._ensure_tables()
 
@@ -154,6 +154,7 @@ class SQLiteDocumentStore(Generic[T]):
                 embedder=self._embedder,
                 sqlite_vec_available=self._sqlite_vec_available,
                 limit=limit,
+                mode=mode,
             )
 
             if not fused:
