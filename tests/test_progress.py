@@ -307,7 +307,7 @@ class TestProgressFailedEvents:
         mock_parser: AsyncMock,
     ) -> None:
         store = AsyncMock()
-        store.save = AsyncMock(side_effect=IOError("store failed"))
+        store.save = AsyncMock(side_effect=OSError("store failed"))
 
         events: list[ProgressEvent] = []
 
