@@ -385,6 +385,12 @@ config_app: Any = typer.Typer(
 )
 app.add_typer(config_app)
 
+# ── Auth sub-app ───────────────────────────────────────────────
+
+from billfox.cli.auth import auth_app  # noqa: E402
+
+app.add_typer(auth_app)
+
 
 @config_app.command("set")  # type: ignore[untyped-decorator]
 def config_set(
