@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
@@ -7,11 +8,14 @@ from pydantic import BaseModel
 
 from billfox._progress import ProgressCallback, ProgressEvent, Stage, Status
 from billfox._types import Document, ExtractionResult
+from billfox.backup._base import DocumentBackup
 from billfox.extract._base import Extractor
 from billfox.parse._base import Parser
 from billfox.preprocess._base import Preprocessor
 from billfox.source._base import DocumentSource
 from billfox.store._base import DocumentStore
+
+logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -28,6 +32,7 @@ class Pipeline(Generic[T]):
     parser: Parser[T]
     preprocessors: list[Preprocessor] = field(default_factory=list)
     store: DocumentStore[T] | None = None
+    backup: DocumentBackup | None = None
     on_progress: ProgressCallback | None = None
 
     async def _emit(
@@ -92,6 +97,13 @@ class Pipeline(Generic[T]):
                 await self._emit(Stage.STORING, Status.FAILED, message=str(exc))
                 raise
 
+        # BACKUP
+        if self.backup is not None:
+            try:
+                await self.backup.backup(document)
+            except Exception:
+                logger.warning("Backup failed", exc_info=True)
+
         return parsed
 
     async def extract_only(self, uri: str) -> ExtractionResult:
@@ -124,6 +136,13 @@ class Pipeline(Generic[T]):
         except Exception as exc:
             await self._emit(Stage.EXTRACTING, Status.FAILED, message=str(exc))
             raise
+
+        # BACKUP
+        if self.backup is not None:
+            try:
+                await self.backup.backup(document)
+            except Exception:
+                logger.warning("Backup failed", exc_info=True)
 
         return result
 
