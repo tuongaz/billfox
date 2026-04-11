@@ -1,7 +1,80 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
 name = "billfox"
-version = "0.1.0"
-description = "Add your description here"
+dynamic = ["version"]
+description = "Composable document data extraction: load, preprocess, OCR, LLM parse, store with vector search."
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+license = "MIT"
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.0"]
+
+[project.optional-dependencies]
+mistral = ["mistralai>=1.0"]
+yolo = ["onnxruntime>=1.16", "numpy>=1.24", "Pillow>=10.0"]
+llm = ["pydantic-ai>=0.1"]
+openai = ["openai>=1.0"]
+store = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.19", "sqlite-vec>=0.1"]
+cli = ["typer>=0.9", "rich>=13.0"]
+all = [
+    "billfox[mistral]",
+    "billfox[yolo]",
+    "billfox[llm]",
+    "billfox[openai]",
+    "billfox[store]",
+    "billfox[cli]",
+]
+dev = [
+    "billfox[all]",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "mypy>=1.5",
+    "ruff>=0.1",
+    "coverage>=7.0",
+]
+
+[project.scripts]
+billfox = "billfox.cli:app"
+
+[tool.hatch.version]
+path = "src/billfox/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/billfox"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+mypy_path = "src"
+
+[[tool.mypy.overrides]]
+module = "mistralai.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pydantic_ai.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "onnxruntime.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "sqlite_vec.*"
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
