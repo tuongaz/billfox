@@ -200,9 +200,11 @@ class TestYOLOPreprocessor:
     @pytest.mark.asyncio
     async def test_lazy_import_error(self) -> None:
         preprocessor = YOLOPreprocessor(model_path="/fake/model.onnx")
-        with patch.dict("sys.modules", {"onnxruntime": None}):
-            with pytest.raises(RuntimeError, match="onnxruntime is required"):
-                preprocessor._get_session()
+        with (
+            patch.dict("sys.modules", {"onnxruntime": None}),
+            pytest.raises(RuntimeError, match="onnxruntime is required"),
+        ):
+            preprocessor._get_session()
 
     @pytest.mark.asyncio
     async def test_protocol_conformance(self) -> None:

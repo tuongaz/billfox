@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 import struct
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -62,13 +61,15 @@ def test_dimensions_unknown_model() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_embed_empty_list() -> None:
+@pytest.mark.asyncio
+async def test_embed_empty_list() -> None:
     embedder = OpenAIEmbedder(api_key="sk-test")
-    result = asyncio.get_event_loop().run_until_complete(embedder.embed([]))
+    result = await embedder.embed([])
     assert result == []
 
 
-def test_embed_single_text() -> None:
+@pytest.mark.asyncio
+async def test_embed_single_text() -> None:
     embedder = OpenAIEmbedder(api_key="sk-test")
     expected = [0.1, 0.2, 0.3]
 
@@ -79,9 +80,7 @@ def test_embed_single_text() -> None:
     mock_client.embeddings.create = AsyncMock(return_value=mock_response)
 
     with patch.object(embedder, "_get_client", return_value=mock_client):
-        result = asyncio.get_event_loop().run_until_complete(
-            embedder.embed(["hello"])
-        )
+        result = await embedder.embed(["hello"])
 
     assert result == [expected]
     mock_client.embeddings.create.assert_called_once_with(
@@ -91,7 +90,8 @@ def test_embed_single_text() -> None:
     )
 
 
-def test_embed_multiple_texts() -> None:
+@pytest.mark.asyncio
+async def test_embed_multiple_texts() -> None:
     embedder = OpenAIEmbedder(api_key="sk-test")
     vectors = [[0.1, 0.2], [0.3, 0.4], [0.5, 0.6]]
 
@@ -108,9 +108,7 @@ def test_embed_multiple_texts() -> None:
     mock_client.embeddings.create = mock_create
 
     with patch.object(embedder, "_get_client", return_value=mock_client):
-        result = asyncio.get_event_loop().run_until_complete(
-            embedder.embed(["a", "b", "c"])
-        )
+        result = await embedder.embed(["a", "b", "c"])
 
     assert result == vectors
 

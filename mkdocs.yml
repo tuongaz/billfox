@@ -1,0 +1,37 @@
+site_name: billfox
+site_description: Composable document data extraction for Python
+repo_url: https://github.com/billfox-ai/billfox
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: teal
+      accent: amber
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - navigation.sections
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Guides:
+      - Custom Extractor: custom-extractor.md
+      - Custom Preprocessor: custom-preprocessor.md
+      - Storage and Search: storage-and-search.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details

@@ -1,3 +1,5 @@
+"""Document preprocessing modules."""
+
 from billfox.preprocess._base import Preprocessor
 from billfox.preprocess.chain import PreprocessorChain
 from billfox.preprocess.resize import ResizePreprocessor

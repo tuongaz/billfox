@@ -107,6 +107,7 @@ class SQLiteDocumentStore(Generic[T]):
     # ------------------------------------------------------------------
 
     async def save(self, document_id: str, data: T) -> None:
+        """Save a Pydantic model instance, upserting if the ID already exists."""
         await self._ensure_tables()
         data_json = data.model_dump_json()
 
@@ -130,6 +131,7 @@ class SQLiteDocumentStore(Generic[T]):
                 await self._sync_embeddings(session, document_id, data)
 
     async def get(self, document_id: str) -> T | None:
+        """Retrieve a document by ID, or ``None`` if not found."""
         await self._ensure_tables()
         async with self._session_factory() as session:
             row = await session.get(DocumentRow, document_id)
@@ -179,6 +181,7 @@ class SQLiteDocumentStore(Generic[T]):
             return results
 
     async def delete(self, document_id: str) -> None:
+        """Delete a document and its associated embeddings."""
         await self._ensure_tables()
         async with self._session_factory() as session, session.begin():
             row = await session.get(DocumentRow, document_id)

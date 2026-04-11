@@ -32,6 +32,7 @@ class OpenAIEmbedder:
 
     @property
     def dimensions(self) -> int:
+        """Return the embedding vector dimensionality for the configured model."""
         return _MODEL_DIMENSIONS.get(self._model, 1536)
 
     def _get_client(self) -> Any:
@@ -45,6 +46,14 @@ class OpenAIEmbedder:
         return openai.AsyncOpenAI(api_key=self._api_key)
 
     async def embed(self, texts: list[str]) -> list[list[float]]:
+        """Generate embeddings for a list of texts in parallel.
+
+        Args:
+            texts: Texts to embed.
+
+        Returns:
+            One embedding vector per input text.
+        """
         if not texts:
             return []
 
