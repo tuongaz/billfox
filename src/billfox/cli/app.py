@@ -391,6 +391,12 @@ from billfox.cli.auth import auth_app  # noqa: E402
 
 app.add_typer(auth_app)
 
+# ── Backup command ────────────────────────────────────────────
+
+from billfox.cli.backup import backup as backup_command  # noqa: E402
+
+app.command("backup")(backup_command)
+
 
 @config_app.command("set")  # type: ignore[untyped-decorator]
 def config_set(
