@@ -18,6 +18,7 @@ llm = ["pydantic-ai>=0.1"]
 openai = ["openai>=1.0"]
 store = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.19", "sqlite-vec>=0.1"]
 cli = ["typer>=0.13", "rich>=13.0", "tomli-w>=1.0"]
+google-drive = ["google-api-python-client>=2.80", "google-auth-httplib2>=0.2", "google-auth-oauthlib>=1.0"]
 all = [
     "billfox[mistral]",
     "billfox[yolo]",
@@ -25,6 +26,7 @@ all = [
     "billfox[openai]",
     "billfox[store]",
     "billfox[cli]",
+    "billfox[google-drive]",
 ]
 dev = [
     "billfox[all]",
@@ -73,6 +75,14 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "sqlite_vec.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "google_auth_oauthlib.*"
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
