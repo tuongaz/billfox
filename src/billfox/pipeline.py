@@ -5,6 +5,7 @@ from typing import Generic, TypeVar
 
 from pydantic import BaseModel
 
+from billfox._progress import ProgressCallback, ProgressEvent, Stage, Status
 from billfox._types import Document, ExtractionResult
 from billfox.extract._base import Extractor
 from billfox.parse._base import Parser
@@ -27,15 +28,70 @@ class Pipeline(Generic[T]):
     parser: Parser[T]
     preprocessors: list[Preprocessor] = field(default_factory=list)
     store: DocumentStore[T] | None = None
+    on_progress: ProgressCallback | None = None
+
+    async def _emit(
+        self,
+        stage: Stage,
+        status: Status,
+        *,
+        message: str | None = None,
+        metadata: dict[str, object] | None = None,
+    ) -> None:
+        if self.on_progress is None:
+            return
+        await self.on_progress(ProgressEvent(stage=stage, status=status, message=message, metadata=metadata))
 
     async def run(self, uri: str, document_id: str | None = None) -> T:
         """Execute the full pipeline: load -> preprocess -> extract -> parse -> store."""
-        document = await self.source.load(uri)
-        document = await self._preprocess(document)
-        result = await self.extractor.extract(document)
-        parsed = await self.parser.parse(result.markdown)
+        # LOADING
+        try:
+            await self._emit(Stage.LOADING, Status.STARTED)
+            document = await self.source.load(uri)
+            await self._emit(Stage.LOADING, Status.COMPLETED)
+        except Exception as exc:
+            await self._emit(Stage.LOADING, Status.FAILED, message=str(exc))
+            raise
+
+        # PREPROCESSING
+        if self.preprocessors:
+            try:
+                for p in self.preprocessors:
+                    await self._emit(Stage.PREPROCESSING, Status.STARTED, message=type(p).__name__)
+                document = await self._preprocess(document)
+                await self._emit(Stage.PREPROCESSING, Status.COMPLETED)
+            except Exception as exc:
+                await self._emit(Stage.PREPROCESSING, Status.FAILED, message=str(exc))
+                raise
+
+        # EXTRACTING
+        try:
+            await self._emit(Stage.EXTRACTING, Status.STARTED)
+            result = await self.extractor.extract(document)
+            await self._emit(Stage.EXTRACTING, Status.COMPLETED, metadata={"pages": len(result.pages)})
+        except Exception as exc:
+            await self._emit(Stage.EXTRACTING, Status.FAILED, message=str(exc))
+            raise
+
+        # PARSING
+        try:
+            await self._emit(Stage.PARSING, Status.STARTED)
+            parsed = await self.parser.parse(result.markdown)
+            await self._emit(Stage.PARSING, Status.COMPLETED)
+        except Exception as exc:
+            await self._emit(Stage.PARSING, Status.FAILED, message=str(exc))
+            raise
+
+        # STORING
         if self.store is not None and document_id is not None:
-            await self.store.save(document_id, parsed)
+            try:
+                await self._emit(Stage.STORING, Status.STARTED)
+                await self.store.save(document_id, parsed)
+                await self._emit(Stage.STORING, Status.COMPLETED)
+            except Exception as exc:
+                await self._emit(Stage.STORING, Status.FAILED, message=str(exc))
+                raise
+
         return parsed
 
     async def extract_only(self, uri: str) -> ExtractionResult:
