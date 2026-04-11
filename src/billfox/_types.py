@@ -38,3 +38,12 @@ class SearchResult:
     data: dict[str, object]
     score: float
     signals: dict[str, float] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class BackupResult:
+    """Result of backing up a document to a remote location."""
+
+    uri: str
+    provider: str
+    metadata: dict[str, str] = field(default_factory=dict)
