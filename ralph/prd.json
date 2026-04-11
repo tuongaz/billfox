@@ -34,7 +34,7 @@
         "Typecheck passes"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Foundation for all other stories. No external dependencies beyond pydantic."
     },
     {
@@ -52,7 +52,7 @@
         "Typecheck passes"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Simple module. Reference Billfox pattern: api/src/utils/storage.py for file loading."
     },
     {
@@ -73,7 +73,7 @@
         "Typecheck passes"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Port from api/src/ai/yolo/receipt_onnx.py. Rename receipt→document. Accept user model path."
     },
     {
@@ -92,7 +92,7 @@
         "Typecheck passes"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Port resize from api/src/ai/yolo/image.py. Chain is new composition utility."
     },
     {
@@ -112,7 +112,7 @@
         "Typecheck passes"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Port from api/src/ai/agents/expense/mistral.py. Key detail: image_url vs document_url branching."
     },
     {
@@ -131,7 +131,7 @@
         "Typecheck passes"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "Generic wrapper around pydantic-ai. User provides output_type and system_prompt."
     },
     {
@@ -151,7 +151,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Composes all modules. Each stage is independently swappable."
     },
     {
@@ -171,7 +171,7 @@
         "Typecheck passes"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Port from api/src/ai/embeddings.py. Wrap in Embedder protocol."
     },
     {
@@ -196,7 +196,7 @@
         "Typecheck passes"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Port VectorType from api/src/store/column_types.py (SQLite-only). Port sqlite-vec setup from api/src/store/db.py."
     },
     {
@@ -220,7 +220,7 @@
         "Typecheck passes"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Port from api/src/store/search_pipeline.py (normalize_scores, apply_hybrid_fusion) and api/src/store/search.py (sqlite_vec_knn_search). Generalise from expense-specific to generic."
     },
     {

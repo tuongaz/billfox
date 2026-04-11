@@ -138,9 +138,44 @@ class SQLiteDocumentStore(Generic[T]):
             return self._schema.model_validate_json(row.data_json)
 
     async def search(self, query: str, *, limit: int = 20) -> list[SearchResult]:
+        """Hybrid BM25 + vector search with RRF fusion.
+
+        If an embedder is available and sqlite-vec is loaded, runs both BM25
+        and vector signals.  Otherwise falls back to BM25-only.
+        """
         await self._ensure_tables()
-        # Placeholder — full search implemented in US-010
-        return []
+
+        from billfox.store._search import hybrid_search
+
+        async with self._session_factory() as session:
+            fused = await hybrid_search(
+                session,
+                query,
+                embedder=self._embedder,
+                sqlite_vec_available=self._sqlite_vec_available,
+                limit=limit,
+            )
+
+            if not fused:
+                return []
+
+            # Fetch document data for results
+            results: list[SearchResult] = []
+            for doc_id, signals in fused:
+                row = await session.get(DocumentRow, doc_id)
+                if row is None:
+                    continue
+                data = self._schema.model_validate_json(row.data_json)
+                results.append(
+                    SearchResult(
+                        document_id=doc_id,
+                        data=data.model_dump(),
+                        score=signals.get("final_score", 0.0),
+                        signals=signals,
+                    )
+                )
+
+            return results
 
     async def delete(self, document_id: str) -> None:
         await self._ensure_tables()
