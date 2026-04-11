@@ -20,6 +20,14 @@ Started: Sat 11 Apr 2026 17:07:09 AEST
 - FTS5 `bm25()` returns negative scores (lower = better); negate for fusion (higher = better)
 - sqlite-vec vec0 `distance` is cosine distance; convert to similarity with `1 - distance`
 - Vec0 row IDs use `document_id:field_name` format — split on `:` to extract document_id
+- Do NOT use `from __future__ import annotations` in CLI modules — breaks typer's runtime annotation inspection
+- typer requires `>=0.13` for click 8.3+ compatibility (`make_metavar` signature change)
+- `python -m billfox` requires `__main__.py` at package root (`src/billfox/__main__.py`), not in cli/
+- Patch lazy-imported classes at their source module (e.g. `billfox.source.local.LocalFileSource`) for test mocking
+- Config helpers use `_get_config_dir()` function (not constant) to enable test patching with `tmp_path`
+- `tomli_w.dump()` takes binary file handle (`"wb"`); `tomllib.load()` also takes binary (`"rb"`)
+- Always use `@pytest.mark.asyncio async def` for async tests — `asyncio.get_event_loop().run_until_complete()` is fragile across test runs
+- Long `with` statement combining uses parenthesized form: `with (\n    ctx1,\n    ctx2,\n):`
 ---
 
 ## 2026-04-11 - US-001
@@ -181,4 +189,87 @@ Started: Sat 11 Apr 2026 17:07:09 AEST
   - FTS5 MATCH queries use simple terms, not SQL LIKE — just pass the query text directly
   - Dynamic SQL placeholders for IN clauses need `:id0, :id1, ...` pattern with matching param dict
   - The `_search.py` module is internal (`_` prefix) — no need to export from `__init__.py`
+---
+
+## 2026-04-11 - US-011
+- Implemented `cli/app.py` with Typer application: `extract` and `parse` commands
+- `extract` command: runs OCR and outputs markdown to stdout or `--output` file
+  - Flags: `--extractor` (default mistral), `--preprocess` (comma-separated), `--api-key`, `--output`, `--verbose`
+- `parse` command: runs full pipeline and outputs JSON to stdout or `--output` file
+  - Flags: `--schema` (path:ClassName), `--model`, `--prompt`, `--store`, `--preprocess`, `--api-key`, `--json`, `--verbose`
+  - Dynamic schema loading via `importlib.util.spec_from_file_location`
+- Created `__main__.py` at package root for `python -m billfox`
+- Updated `cli/__init__.py` to export `app`
+- Updated `pyproject.toml`: typer minimum version bumped to `>=0.13` (click 8.3+ compatibility)
+- 22 unit tests using Typer CliRunner, all passing
+- Files changed: src/billfox/cli/app.py (new), src/billfox/__main__.py (new), src/billfox/cli/__init__.py, tests/test_cli_app.py (new), pyproject.toml
+- **Learnings for future iterations:**
+  - Do NOT use `from __future__ import annotations` in CLI modules — typer inspects annotations at runtime and breaks with stringified types
+  - typer 0.12.5 is incompatible with click 8.3.1 (`make_metavar()` signature change) — need `>=0.13`
+  - `python -m billfox` requires `__main__.py` at package root (`src/billfox/__main__.py`), not in `cli/` subdirectory
+  - For test mocking with lazy imports inside functions, patch at the source module (e.g. `billfox.source.local.LocalFileSource`) not at the consuming module
+  - Use `# type: ignore[untyped-decorator]` for `@app.command()` when `app` is `Any` typed
+  - `# type: ignore[no-any-return]` needed when returning from lazy-imported function calls typed as `Any`
+---
+
+## 2026-04-11 - US-012
+- Implemented `billfox search <query>` command with flags: `--db`, `--limit`, `--mode` (hybrid/vector/bm25), `--json`, `--verbose`
+  - Search results displayed as rich table (default) or JSON with `--json`
+  - Embedder auto-built from OPENAI_API_KEY env var or config
+  - Mode parameter passed through to `hybrid_search()` for signal selection
+- Implemented `billfox config` sub-app with `set`, `get`, `list` subcommands
+  - Config stored at `~/.billfox/config.toml` using `tomllib` (stdlib) for reading, `tomli-w` for writing
+  - Dot-separated keys for nested access (e.g. `api_keys.mistral`, `defaults.extractor`)
+  - Config directory auto-created on first write
+- Added `mode` parameter to `store/_search.py:hybrid_search()` and `store/sqlite.py:SQLiteDocumentStore.search()`
+  - "hybrid" (default): BM25 + vector with RRF fusion
+  - "bm25": BM25 full-text search only
+  - "vector": vector KNN search only
+- Added `tomli-w>=1.0` to cli extras in pyproject.toml
+- 23 unit tests: 7 search, 9 config, 7 help — all passing
+- Files changed: src/billfox/cli/app.py, src/billfox/store/_search.py, src/billfox/store/sqlite.py, pyproject.toml, tests/test_cli_search_config.py (new)
+- **Learnings for future iterations:**
+  - `tomllib` (stdlib Python 3.11+) is read-only; writing TOML requires third-party `tomli-w`
+  - `tomli_w.dump()` writes to binary file handle (`"wb"` mode), not text
+  - Config helper `_get_config_dir()` as a function (not constant) enables test patching with `tmp_path`
+  - `typer.Typer()` sub-apps added with `app.add_typer(sub_app)` create nested subcommands (e.g. `billfox config set`)
+  - Pydantic `ConfigDict(extra="allow")` enables deserializing unknown schemas for search-only store usage
+  - Adding `mode` default param to concrete class doesn't break Protocol compatibility — mypy accepts extra optional kwargs
+  - Pre-existing embed tests use deprecated `asyncio.get_event_loop()` — they fail when run after tests that use `asyncio.run()` due to event loop state
+---
+
+## 2026-04-11 - US-013
+- Wrote comprehensive README.md with badges, install instructions, 3 quick-start examples (OCR-only, full pipeline, CLI), ASCII architecture diagram, extras table
+- Created mkdocs.yml with mkdocs-material config (dark/light theme toggle, code copy, superfences)
+- Created docs/ directory with 5 pages: index.md, getting-started.md, custom-extractor.md, custom-preprocessor.md, storage-and-search.md
+- Updated CONTRIBUTING.md with full dev setup (venv, extras), testing, code style guidelines, project structure, PR process, adding new modules
+- Updated CHANGELOG.md with v0.1.0 listing all features by category (core, source, preprocessing, extraction, parsing, embedding, storage, CLI)
+- Added docstrings to all public APIs: module docstrings on all `__init__.py` files, method docstrings on `OpenAIEmbedder.embed()`, `OpenAIEmbedder.dimensions`, `SQLiteDocumentStore.save/get/delete`
+- Fixed pre-existing lint error in test_preprocess_yolo.py (SIM117 nested with statements)
+- Fixed 3 pre-existing test failures in test_embed_openai.py — converted `asyncio.get_event_loop().run_until_complete()` to proper `@pytest.mark.asyncio async def` tests
+- Files changed: README.md, CONTRIBUTING.md, CHANGELOG.md, mkdocs.yml, docs/index.md, docs/getting-started.md, docs/custom-extractor.md, docs/custom-preprocessor.md, docs/storage-and-search.md, src/billfox/__init__.py, src/billfox/source/__init__.py, src/billfox/preprocess/__init__.py, src/billfox/extract/__init__.py, src/billfox/parse/__init__.py, src/billfox/embed/__init__.py, src/billfox/embed/openai.py, src/billfox/store/__init__.py, src/billfox/store/sqlite.py, src/billfox/cli/__init__.py, tests/test_embed_openai.py, tests/test_preprocess_yolo.py
+- **Learnings for future iterations:**
+  - Embed tests using `asyncio.get_event_loop()` are fragile — always use `@pytest.mark.asyncio async def` for async tests
+  - `with` statement combining (SIM117) requires parenthesized form when lines are long: `with (\n    ctx1,\n    ctx2,\n):`
+  - mkdocs-material `pymdownx.superfences` extension is needed for fenced code blocks in docs
+  - Module docstrings in `__init__.py` files help documentation generators and IDE tooltips
+---
+
+## 2026-04-11 - US-014
+- Created `.github/workflows/ci.yml` with Python 3.11, 3.12, 3.13 matrix running pytest, mypy --strict, ruff check
+- Created `tests/test_integration.py` with 22 tests covering all acceptance criteria:
+  - **Full pipeline integration** (3 tests): Pipeline.run() with mocked OCR/LLM + real in-memory SQLite, verifying data is persisted and retrievable
+  - **extract_only flow** (2 tests): source -> preprocess -> extract, verifying parse/store are skipped
+  - **Store search round-trip** (3 tests): save -> BM25 search -> verify results, CRUD round-trip, result structure
+  - **Hybrid search ranking** (3 tests): RRF fusion signals present, BM25-only mode, ranking order verification
+  - **Import isolation** (2 tests): `import billfox` in-process and via subprocess
+  - **Extras isolation** (2 tests): MistralExtractor module imports, lazy import error path
+  - **CLI smoke tests** (5 tests): `billfox --help`, extract/parse/search/config help all exit 0
+- All 193 tests pass, mypy strict passes, ruff clean
+- Files changed: .github/workflows/ci.yml (new), tests/test_integration.py (new), ralph/prd.json
+- **Learnings for future iterations:**
+  - `subprocess.run([sys.executable, "-c", ...])` is the robust way to test import isolation in a clean environment
+  - Parenthesized `with` combining (SIM117) works well for 3+ context managers: `with (\n    ctx1,\n    ctx2,\n    ctx3,\n):`
+  - Pre-existing aiosqlite thread warnings are harmless noise from event loop cleanup — not test failures
+  - CI workflow for Python library: `pip install -e ".[dev]"` installs all deps in editable mode
 ---

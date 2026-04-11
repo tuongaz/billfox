@@ -244,7 +244,7 @@
         "Typecheck passes"
       ],
       "priority": 11,
-      "passes": false,
+      "passes": true,
       "notes": "CLI entry point is 'billfox'. Dynamic schema loading via importlib."
     },
     {
@@ -265,7 +265,7 @@
         "Typecheck passes"
       ],
       "priority": 12,
-      "passes": false,
+      "passes": true,
       "notes": "Config stored at ~/.billfox/config.toml. Uses tomllib (stdlib) for reading, tomli-w for writing."
     },
     {
@@ -282,7 +282,7 @@
         "Typecheck passes"
       ],
       "priority": 13,
-      "passes": false,
+      "passes": true,
       "notes": "Focus on practical examples. Architecture diagram should show the pipeline stages."
     },
     {
@@ -303,7 +303,7 @@
         "Typecheck passes"
       ],
       "priority": 14,
-      "passes": false,
+      "passes": true,
       "notes": "Final verification story. All previous stories must pass before this one."
     }
   ]
