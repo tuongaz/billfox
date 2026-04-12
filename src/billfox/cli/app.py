@@ -228,7 +228,7 @@ def extract(
 def parse(
     file: str = typer.Argument(..., help="Path to the document file to parse."),
     schema: str = typer.Option(..., "--schema", "-s", help="Pydantic model in 'path:ClassName' format."),
-    model: str = typer.Option("openai:gpt-4.1", "--model", "-m", help="LLM model identifier."),
+    model: str | None = typer.Option(None, "--model", "-m", help="LLM model identifier (reads from config if not set)."),
     prompt: str = typer.Option(
         "Extract structured data from this document.",
         "--prompt",
@@ -252,6 +252,30 @@ def parse(
 
         logging.basicConfig(level=logging.DEBUG)
 
+    # Resolve model and base_url from config when --model is not passed
+    config = _read_config()
+    base_url: str | None = None
+    resolved_model = model
+
+    if resolved_model is None:
+        llm_provider = _get_nested(config, "defaults.llm.provider")
+        if llm_provider == "ollama":
+            ollama_model = _get_nested(config, "defaults.ollama.model")
+            if ollama_model:
+                resolved_model = f"ollama:{ollama_model}"
+            base_url = _get_nested(config, "defaults.ollama.base_url")
+        else:
+            config_model = _get_nested(config, "defaults.llm.model")
+            if config_model:
+                resolved_model = config_model
+
+    if resolved_model is None:
+        resolved_model = "openai:gpt-4.1"
+
+    # For any ollama: model (including CLI override), pick up base_url from config
+    if resolved_model.startswith("ollama:") and base_url is None:
+        base_url = _get_nested(config, "defaults.ollama.base_url")
+
     schema_cls = _load_schema(schema)
     on_progress = _make_progress_callback()
 
@@ -264,9 +288,10 @@ def parse(
         ext = _build_extractor(extractor, api_key)
         preprocessors = _build_preprocessors(preprocess)
         parser: Any = LLMParser(
-            model=model,
+            model=resolved_model,
             output_type=schema_cls,
             system_prompt=prompt,
+            base_url=base_url,
         )
 
         store_instance = None
