@@ -8,43 +8,17 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+import typer
+from dotenv import load_dotenv
+from rich import print as rprint
+from rich.markup import escape
+
 # Load .env files early, before any command runs.
 # Global (~/.billfox/.env) first, then project-local (./.env).
 # Existing env vars take precedence (override=False is the default).
-try:
-    from dotenv import load_dotenv as _load_dotenv
+load_dotenv(Path.home() / ".billfox" / ".env")
+load_dotenv(Path(".env"))
 
-    _load_dotenv(Path.home() / ".billfox" / ".env")
-    _load_dotenv(Path(".env"))
-except ImportError:
-    pass
-
-
-def _lazy_typer() -> Any:
-    """Lazily import typer with clear error message."""
-    try:
-        import typer
-    except ImportError:
-        raise ImportError(
-            "typer is required for the billfox CLI. "
-            "Install it with: pip install 'billfox[cli]'"
-        ) from None
-    return typer
-
-
-def _lazy_rich_print() -> Any:
-    """Lazily import rich.print with clear error message."""
-    try:
-        from rich import print as rprint
-    except ImportError:
-        raise ImportError(
-            "rich is required for the billfox CLI. "
-            "Install it with: pip install 'billfox[cli]'"
-        ) from None
-    return rprint
-
-
-typer = _lazy_typer()
 app: Any = typer.Typer(
     name="billfox",
     help="Composable document data extraction: load, preprocess, OCR, LLM parse, store with vector search.",
@@ -59,7 +33,7 @@ def _ensure_configured() -> None:
     """
     config = _read_config()
     if _get_nested(config, "defaults.ocr.provider") is None:
-        rprint = _lazy_rich_print()
+
         rprint(
             "[yellow]billfox is not configured yet. "
             "Run 'billfox init' to set up.[/yellow]"
@@ -79,6 +53,8 @@ def _make_progress_callback() -> Any:
     console = Console(stderr=True)
 
     async def _on_progress(event: ProgressEvent) -> None:
+
+
         stage_name = event.stage.value.lower()
         if event.status == Status.STARTED:
             console.print(f"[bold blue]{stage_name}[/bold blue]...", highlight=False)
@@ -86,7 +62,7 @@ def _make_progress_callback() -> Any:
             console.print(f"[bold blue]{stage_name}[/bold blue] [green]done[/green]", highlight=False)
         elif event.status == Status.FAILED:
             console.print(
-                f"[bold blue]{stage_name}[/bold blue] [red]{event.message}[/red]",
+                f"[bold blue]{stage_name}[/bold blue] [red]{escape(event.message or '')}[/red]",
                 highlight=False,
             )
 
@@ -181,6 +157,10 @@ def extract(
     _ctx = _click.get_current_context()
     if _ctx.get_parameter_source("extractor") != _click.core.ParameterSource.COMMANDLINE:
         _ensure_configured()
+        config = _read_config()
+        configured_provider = _get_nested(config, "defaults.ocr.provider")
+        if configured_provider:
+            extractor = configured_provider
 
     if verbose:
         import logging
@@ -231,13 +211,14 @@ def extract(
     try:
         markdown = asyncio.run(_run())
     except (FileNotFoundError, ValueError, RuntimeError, ImportError) as e:
-        rprint = _lazy_rich_print()
-        rprint(f"[red]Error:[/red] {e}")
+
+
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(code=1) from None
 
     if output:
         Path(output).write_text(markdown, encoding="utf-8")
-        rprint = _lazy_rich_print()
+
         rprint(f"[green]Output written to {output}[/green]")
     else:
         sys.stdout.write(markdown)
@@ -277,6 +258,12 @@ def parse(
     )
     if not _has_override:
         _ensure_configured()
+
+    # Use configured OCR provider when --extractor not passed
+    if _ctx.get_parameter_source("extractor") != _click.core.ParameterSource.COMMANDLINE:
+        config_ocr = _get_nested(_read_config(), "defaults.ocr.provider")
+        if config_ocr:
+            extractor = config_ocr
 
     if verbose:
         import logging
@@ -359,8 +346,9 @@ def parse(
     try:
         result = asyncio.run(_run())
     except (FileNotFoundError, ValueError, RuntimeError, ImportError) as e:
-        rprint = _lazy_rich_print()
-        rprint(f"[red]Error:[/red] {e}")
+
+
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(code=1) from None
 
     output_text = (
@@ -370,7 +358,7 @@ def parse(
 
     if output:
         Path(output).write_text(output_text, encoding="utf-8")
-        rprint = _lazy_rich_print()
+
         rprint(f"[green]Output written to {output}[/green]")
     else:
         sys.stdout.write(output_text)
@@ -399,26 +387,17 @@ def _read_config() -> dict[str, Any]:
         return tomllib.load(f)
 
 
-def _lazy_tomli_w() -> Any:
-    """Lazily import tomli_w with clear error message."""
-    try:
-        import tomli_w
-    except ImportError:
-        raise ImportError(
-            "tomli-w is required for writing configuration. "
-            "Install it with: pip install 'billfox[cli]'"
-        ) from None
-    return tomli_w
 
 
 def _write_config(config: dict[str, Any]) -> None:
     """Write config to ~/.billfox/config.toml."""
-    tw = _lazy_tomli_w()
+    import tomli_w
+
     config_dir = _get_config_dir()
     config_dir.mkdir(parents=True, exist_ok=True)
     config_file = config_dir / "config.toml"
     with open(config_file, "wb") as f:
-        tw.dump(config, f)
+        tomli_w.dump(config, f)
 
 
 def _get_nested(config: dict[str, Any], key: str) -> Any:
@@ -495,7 +474,6 @@ def config_set(
     config = _read_config()
     _set_nested(config, key, value)
     _write_config(config)
-    rprint = _lazy_rich_print()
     rprint(f"[green]Set {key} = {value}[/green]")
 
 
@@ -507,7 +485,7 @@ def config_get(
     config = _read_config()
     val = _get_nested(config, key)
     if val is None:
-        rprint = _lazy_rich_print()
+
         rprint(f"[yellow]Key {key!r} not set[/yellow]")
         raise typer.Exit(code=1)
     typer.echo(val)
@@ -518,10 +496,9 @@ def config_list() -> None:
     """List all configuration values."""
     config = _read_config()
     if not config:
-        rprint = _lazy_rich_print()
+
         rprint("[yellow]No configuration set.[/yellow]")
         return
-    rprint = _lazy_rich_print()
     for k, v in _flatten_config(config):
         rprint(f"[bold]{k}[/bold] = {v}")
 
@@ -630,8 +607,9 @@ def search(
     try:
         results = asyncio.run(_run())
     except Exception as e:
-        rprint = _lazy_rich_print()
-        rprint(f"[red]Error:[/red] {e}")
+
+
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(code=1) from None
 
     if json_output:

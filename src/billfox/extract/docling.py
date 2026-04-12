@@ -51,10 +51,10 @@ class DoclingExtractor:
             return self._converter
         try:
             from docling.document_converter import DocumentConverter
-        except ImportError:
+        except ImportError as exc:
             raise ImportError(
                 "docling is required for DoclingExtractor. "
-                "Install it with: pip install 'billfox[docling]'"
+                f"Install it with: pip install 'billfox[docling]' ({exc})"
             ) from None
         self._converter = DocumentConverter()
         return self._converter
@@ -63,9 +63,10 @@ class DoclingExtractor:
         """Run conversion synchronously (called via asyncio.to_thread)."""
         _validate_mime(document.mime_type)
 
+        converter = self._get_converter()
+
         from docling.datamodel.base_models import DocumentStream
 
-        converter = self._get_converter()
         ext = _MIME_TO_EXT.get(document.mime_type, ".bin")
         stream = DocumentStream(
             name=f"document{ext}",

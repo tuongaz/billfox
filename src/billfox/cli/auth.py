@@ -5,20 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-
-def _lazy_typer() -> Any:
-    """Lazily import typer with clear error message."""
-    try:
-        import typer
-    except ImportError:
-        raise ImportError(
-            "typer is required for the billfox CLI. "
-            "Install it with: pip install 'billfox[cli]'"
-        ) from None
-    return typer
-
-
-typer = _lazy_typer()
+import typer
 
 auth_app: Any = typer.Typer(
     name="auth",

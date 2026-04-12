@@ -8,20 +8,7 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
-
-def _lazy_typer() -> Any:
-    """Lazily import typer with clear error message."""
-    try:
-        import typer
-    except ImportError:
-        raise ImportError(
-            "typer is required for the billfox CLI. "
-            "Install it with: pip install 'billfox[cli]'"
-        ) from None
-    return typer
-
-
-typer = _lazy_typer()
+import typer
 
 
 def build_backup_from_config(

@@ -6,20 +6,8 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-
-
-def _lazy_typer() -> Any:
-    """Lazily import typer."""
-    import typer
-
-    return typer
-
-
-def _lazy_rich_console() -> Any:
-    """Lazily import Rich Console."""
-    from rich.console import Console
-
-    return Console(stderr=True)
+import typer
+from rich.console import Console
 
 
 def _check_ollama(base_url: str) -> list[str] | None:
@@ -35,8 +23,7 @@ def _check_ollama(base_url: str) -> list[str] | None:
 
 def _prompt_choice(prompt_text: str, choices: list[str], descriptions: list[str]) -> int:
     """Display numbered choices and return the 1-based selection index."""
-    typer = _lazy_typer()
-    console = _lazy_rich_console()
+    console = Console(stderr=True)
 
     console.print(f"\n[bold]{prompt_text}[/bold]")
     for i, (choice, desc) in enumerate(zip(choices, descriptions, strict=True), 1):
@@ -57,13 +44,12 @@ def _prompt_choice(prompt_text: str, choices: list[str], descriptions: list[str]
 
 
 def init(
-    yes: bool = _lazy_typer().Option(False, "--yes", "-y", help="Skip confirmation when overwriting existing config."),
+    yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation when overwriting existing config."),
 ) -> None:
     """Interactive setup wizard for billfox."""
     from billfox.cli.app import _get_config_dir, _read_config, _write_config
 
-    typer = _lazy_typer()
-    console = _lazy_rich_console()
+    console = Console(stderr=True)
 
     config_dir = _get_config_dir()
     config_file = config_dir / "config.toml"
