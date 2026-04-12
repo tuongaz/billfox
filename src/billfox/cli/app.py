@@ -270,6 +270,7 @@ def parse(
         )
 
         store_instance = None
+        backup_instance = None
         if store:
             from billfox.store.sqlite import SQLiteDocumentStore
 
@@ -278,12 +279,21 @@ def parse(
                 schema=schema_cls,
             )
 
+            # Also set up backup from config when storing
+            config = _read_config()
+            backup_provider = _get_nested(config, "defaults.backup.provider")
+            backup_local_path = _get_nested(config, "defaults.backup.local_path")
+            backup_instance = build_backup_from_config(
+                backup_provider, backup_local_path,
+            )
+
         pipeline: Any = Pipeline(
             source=source,
             extractor=ext,
             parser=parser,
             preprocessors=preprocessors,
             store=store_instance,
+            backup=backup_instance,
             on_progress=on_progress,
         )
 
@@ -409,6 +419,7 @@ app.add_typer(auth_app)
 # ── Backup command ────────────────────────────────────────────
 
 from billfox.cli.backup import backup as backup_command  # noqa: E402
+from billfox.cli.backup import build_backup_from_config  # noqa: E402
 
 app.command("backup")(backup_command)
 
