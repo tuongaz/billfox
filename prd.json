@@ -50,7 +50,7 @@
         "Tests cover: folder creation, file writing, date structure, overwrite behavior, protocol conformance"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Follow the same async pattern as GoogleDriveBackup: sync method wrapped in asyncio.to_thread(). Reference backup/google_drive/client.py for the date folder pattern (YYYY/MM/DD with zero-padded month/day using UTC)."
     },
     {

@@ -4,6 +4,9 @@
 - Test patterns: use `unittest.mock.patch("pydantic_ai.Agent")` to mock Agent creation, `AsyncMock` for async agent.run()
 - Use `FakeRunResult(output=...)` dataclass pattern for mocking pydantic-ai run results
 - All test classes in `tests/test_parse_llm.py` follow `TestLLMParser*` naming
+- Backup providers follow async pattern: sync method `_backup_sync()` wrapped in `asyncio.to_thread()`
+- Date folders use UTC and zero-padded month/day: `YYYY/MM/DD`
+- Mock `datetime` in backup modules by patching `billfox.backup.<module>.datetime`
 
 ---
 
@@ -19,5 +22,16 @@
   - pydantic-ai routes `anthropic:` model strings natively - no code changes needed in LLMParser, just the dependency
   - When adding new optional deps, remember to also add mypy overrides if the package lacks type stubs
   - 247 tests all pass; 3 warnings from aiosqlite event loop cleanup are pre-existing
+
+---
+
+## 2026-04-12 - US-003
+- What was implemented: LocalBackup class in `src/billfox/backup/local.py` implementing DocumentBackup protocol with date-based folder structure (YYYY/MM/DD), re-exported from `backup/__init__.py`
+- Files changed: src/billfox/backup/local.py (new), src/billfox/backup/__init__.py, tests/test_backup_local.py (new)
+- **Learnings for future iterations:**
+  - `Path.write_bytes()` handles overwrite naturally - no need for explicit delete-then-write
+  - `PurePath(source_uri).name` extracts filename from any path format
+  - Test pattern: patch `billfox.backup.local.datetime` to control date in tests, set both `.now.return_value` and `.UTC`
+  - 254 tests all pass after adding 7 new tests
 
 ---
