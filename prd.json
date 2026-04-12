@@ -141,7 +141,7 @@
         "Tests pass"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Modify src/billfox/cli/init.py. httpx is already a transitive dependency. Use httpx.get() synchronously (no need for async in the CLI wizard). Parse response JSON: models are in response.json()['models'], each has a 'name' field."
     },
     {

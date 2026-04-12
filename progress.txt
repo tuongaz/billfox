@@ -15,6 +15,9 @@
 - Init wizard uses `_read_config`, `_write_config`, `_get_config_dir` from `cli/app.py` — import inside function to avoid circular imports
 - Use `typer.prompt()` for interactive input and `typer.confirm()` for yes/no in CLI wizards
 - `_prompt_choice()` helper in `init.py` for numbered menu selections
+- `_check_ollama(base_url)` uses `httpx.get()` with 5s timeout to fetch `/api/tags`; returns `list[str]` of model names or `None` on failure
+- Mock `billfox.cli.init._check_ollama` in integration tests to avoid real HTTP calls
+- `_prompt_choice` supports empty descriptions (displays without " — " suffix) for dynamic model lists
 
 ---
 
@@ -85,5 +88,17 @@
   - `_prompt_choice()` helper pattern: display numbered options, validate input in loop, return 1-based index
   - Pre-existing lint issue in app.py line 231 (line too long) — not introduced by this change
   - 280 tests all pass (no new tests in this story — US-010 covers init tests)
+
+---
+
+## 2026-04-12 - US-008
+- What was implemented: Added Ollama connectivity check to init wizard. When user selects Ollama, wizard now pings `{base_url}/api/tags` to discover available models. If connected, displays numbered model list for selection. If connection fails or no models found, falls back to manual model name prompt with default "llama3.2".
+- Files changed: src/billfox/cli/init.py, tests/test_cli_init_ollama.py (new)
+- **Learnings for future iterations:**
+  - `httpx.get()` is synchronous and works fine in CLI context — no need for async
+  - Ollama `/api/tags` response shape: `{"models": [{"name": "llama3.2:latest"}, ...]}` — each model has a `name` field
+  - `_prompt_choice()` needed update to handle empty descriptions for dynamic model lists
+  - Mock `billfox.cli.init._check_ollama` (not `httpx.get`) in integration tests for cleaner test isolation
+  - 289 tests all pass after adding 9 new tests (6 unit + 3 integration)
 
 ---
