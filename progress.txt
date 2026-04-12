@@ -18,6 +18,10 @@
 - `_check_ollama(base_url)` uses `httpx.get()` with 5s timeout to fetch `/api/tags`; returns `list[str]` of model names or `None` on failure
 - Mock `billfox.cli.init._check_ollama` in integration tests to avoid real HTTP calls
 - `_prompt_choice` supports empty descriptions (displays without " — " suffix) for dynamic model lists
+- `_ensure_configured()` in `cli/app.py` checks `defaults.ocr.provider` as minimum config indicator
+- Use `click.get_current_context().get_parameter_source(name)` with `ParameterSource.COMMANDLINE` to detect explicit CLI flags
+- For backup.py guard: lazy import `_ensure_configured` from `app.py` inside function body (same circular import pattern as init.py)
+- When adding guards, existing tests need explicit flags (`--extractor docling`, `--model openai:gpt-4.1`) or OCR config in mocked configs
 
 ---
 
@@ -100,5 +104,16 @@
   - `_prompt_choice()` needed update to handle empty descriptions for dynamic model lists
   - Mock `billfox.cli.init._check_ollama` (not `httpx.get`) in integration tests for cleaner test isolation
   - 289 tests all pass after adding 9 new tests (6 unit + 3 integration)
+
+---
+
+## 2026-04-12 - US-009
+- What was implemented: Added config completeness guard to extract, parse, and backup CLI commands. `_ensure_configured()` helper checks `defaults.ocr.provider` in config.toml. Guard skipped when explicit CLI flags are passed (`--extractor` for extract, `--model`/`--extractor` for parse). Uses `click.get_current_context().get_parameter_source()` to detect explicit flags. Backup command uses lazy import to avoid circular imports.
+- Files changed: src/billfox/cli/app.py, src/billfox/cli/backup.py, tests/test_cli_app.py, tests/test_cli_backup.py, tests/test_cli_parse_llm_config.py
+- **Learnings for future iterations:**
+  - `click.get_current_context().get_parameter_source("param_name")` returns `ParameterSource.COMMANDLINE` when explicitly passed, `ParameterSource.DEFAULT` otherwise — works inside typer commands
+  - When adding cross-cutting guards, existing tests need explicit CLI flags or valid mock configs to bypass the guard
+  - The `_ensure_configured` pattern: lazy import from app.py inside function body in other CLI modules (same as init.py pattern)
+  - 289 tests all pass (no new tests — existing tests updated for guard compatibility; US-010 covers guard-specific tests)
 
 ---

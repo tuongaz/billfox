@@ -52,6 +52,21 @@ app: Any = typer.Typer(
 )
 
 
+def _ensure_configured() -> None:
+    """Check that billfox has been configured via 'billfox init'.
+
+    Exits with code 1 if config.toml is missing or defaults.ocr.provider is not set.
+    """
+    config = _read_config()
+    if _get_nested(config, "defaults.ocr.provider") is None:
+        rprint = _lazy_rich_print()
+        rprint(
+            "[yellow]billfox is not configured yet. "
+            "Run 'billfox init' to set up.[/yellow]"
+        )
+        raise typer.Exit(code=1)
+
+
 def _make_progress_callback() -> Any:
     """Create a progress callback for CLI commands, or None if not a TTY."""
     if not sys.stdout.isatty():
@@ -161,6 +176,12 @@ def extract(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
     """Extract markdown from a document using OCR."""
+    import click as _click
+
+    _ctx = _click.get_current_context()
+    if _ctx.get_parameter_source("extractor") != _click.core.ParameterSource.COMMANDLINE:
+        _ensure_configured()
+
     if verbose:
         import logging
 
@@ -247,6 +268,16 @@ def parse(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
     """Parse a document into structured data using OCR + LLM."""
+    import click as _click
+
+    _ctx = _click.get_current_context()
+    _has_override = (
+        _ctx.get_parameter_source("model") == _click.core.ParameterSource.COMMANDLINE
+        or _ctx.get_parameter_source("extractor") == _click.core.ParameterSource.COMMANDLINE
+    )
+    if not _has_override:
+        _ensure_configured()
+
     if verbose:
         import logging
 

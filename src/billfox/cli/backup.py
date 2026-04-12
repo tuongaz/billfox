@@ -61,6 +61,10 @@ def backup(
     files: list[str] = typer.Argument(..., help="File(s) to back up."),  # noqa: B008
 ) -> None:
     """Back up files using the configured backup provider."""
+    from billfox.cli.app import _ensure_configured  # lazy import to avoid circular
+
+    _ensure_configured()
+
     from rich.console import Console
 
     console = Console(stderr=True)

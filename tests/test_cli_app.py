@@ -40,7 +40,7 @@ class TestExtractCommand:
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
             patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
         ):
-            result = runner.invoke(app, ["extract", str(img)])
+            result = runner.invoke(app, ["extract", str(img), "--extractor", "docling"])
 
         assert result.exit_code == 0
         assert "# Hello" in result.output
@@ -67,7 +67,7 @@ class TestExtractCommand:
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
             patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
         ):
-            result = runner.invoke(app, ["extract", str(img), "--output", str(out)])
+            result = runner.invoke(app, ["extract", str(img), "--extractor", "docling", "--output", str(out)])
 
         assert result.exit_code == 0
         assert out.read_text() == "Extracted markdown"
@@ -77,7 +77,7 @@ class TestExtractCommand:
         mock_source.load = AsyncMock(side_effect=FileNotFoundError("File not found: /nonexistent"))
 
         with patch("billfox.source.local.LocalFileSource", return_value=mock_source):
-            result = runner.invoke(app, ["extract", "/nonexistent.jpg"])
+            result = runner.invoke(app, ["extract", "/nonexistent.jpg", "--extractor", "docling"])
 
         assert result.exit_code == 1
         assert "Error" in result.output
@@ -111,7 +111,7 @@ class TestExtractCommand:
             patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
             patch("billfox.preprocess.resize.ResizePreprocessor", return_value=mock_resize),
         ):
-            result = runner.invoke(app, ["extract", str(img), "--preprocess", "resize"])
+            result = runner.invoke(app, ["extract", str(img), "--extractor", "docling", "--preprocess", "resize"])
 
         assert result.exit_code == 0
         mock_resize.process.assert_awaited_once()
@@ -155,7 +155,7 @@ class TestExtractCommand:
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
             patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
         ):
-            result = runner.invoke(app, ["extract", str(img), "--verbose"])
+            result = runner.invoke(app, ["extract", str(img), "--extractor", "docling", "--verbose"])
 
         assert result.exit_code == 0
 
@@ -188,7 +188,7 @@ class TestParseCommand:
         with patch("billfox.pipeline.Pipeline", return_value=mock_pipeline):
             result = runner.invoke(
                 app,
-                ["parse", str(img), "--schema", f"{schema_file}:Invoice"],
+                ["parse", str(img), "--schema", f"{schema_file}:Invoice", "--model", "openai:gpt-4.1"],
             )
 
         assert result.exit_code == 0
@@ -217,7 +217,7 @@ class TestParseCommand:
         with patch("billfox.pipeline.Pipeline", return_value=mock_pipeline):
             result = runner.invoke(
                 app,
-                ["parse", str(img), "--schema", f"{schema_file}:Invoice", "--json"],
+                ["parse", str(img), "--schema", f"{schema_file}:Invoice", "--model", "openai:gpt-4.1", "--json"],
             )
 
         assert result.exit_code == 0
@@ -248,6 +248,7 @@ class TestParseCommand:
                 [
                     "parse", str(img),
                     "--schema", f"{schema_file}:Item",
+                    "--model", "openai:gpt-4.1",
                     "--output", str(out),
                 ],
             )
@@ -263,7 +264,7 @@ class TestParseCommand:
 
         result = runner.invoke(
             app,
-            ["parse", str(img), "--schema", "no_colon_here"],
+            ["parse", str(img), "--schema", "no_colon_here", "--model", "openai:gpt-4.1"],
         )
         assert result.exit_code != 0
 
@@ -273,7 +274,7 @@ class TestParseCommand:
 
         result = runner.invoke(
             app,
-            ["parse", str(img), "--schema", "/nonexistent/schema.py:Foo"],
+            ["parse", str(img), "--schema", "/nonexistent/schema.py:Foo", "--model", "openai:gpt-4.1"],
         )
         assert result.exit_code != 0
 
@@ -290,7 +291,7 @@ class TestParseCommand:
 
         result = runner.invoke(
             app,
-            ["parse", str(img), "--schema", f"{schema_file}:Bar"],
+            ["parse", str(img), "--schema", f"{schema_file}:Bar", "--model", "openai:gpt-4.1"],
         )
         assert result.exit_code != 0
 
@@ -319,6 +320,7 @@ class TestParseCommand:
                 [
                     "parse", str(img),
                     "--schema", f"{schema_file}:Item",
+                    "--model", "openai:gpt-4.1",
                     "--store", str(db_path),
                 ],
             )

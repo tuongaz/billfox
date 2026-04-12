@@ -73,9 +73,12 @@ class TestBackupCommandProviderSelection:
             f'local_path = "{backup_dir}"\n'
         )
 
-        with patch(
-            "billfox.cli.backup._read_backup_config",
-            return_value=("local", str(backup_dir)),
+        with (
+            patch("billfox.cli.app._ensure_configured"),
+            patch(
+                "billfox.cli.backup._read_backup_config",
+                return_value=("local", str(backup_dir)),
+            ),
         ):
             result = runner.invoke(app, ["backup", str(test_file)])
 
@@ -96,9 +99,12 @@ class TestBackupCommandProviderSelection:
             return_value=MagicMock(uri="gdrive://file123"),
         )
 
-        with patch(
-            "billfox.cli.backup._read_backup_config",
-            return_value=(None, None),
+        with (
+            patch("billfox.cli.app._ensure_configured"),
+            patch(
+                "billfox.cli.backup._read_backup_config",
+                return_value=(None, None),
+            ),
         ):
             result = runner.invoke(app, ["backup", str(test_file)])
 
@@ -117,9 +123,12 @@ class TestBackupCommandProviderSelection:
             return_value=MagicMock(uri="gdrive://file123"),
         )
 
-        with patch(
-            "billfox.cli.backup._read_backup_config",
-            return_value=("google_drive", None),
+        with (
+            patch("billfox.cli.app._ensure_configured"),
+            patch(
+                "billfox.cli.backup._read_backup_config",
+                return_value=("google_drive", None),
+            ),
         ):
             result = runner.invoke(app, ["backup", str(test_file)])
 
@@ -161,6 +170,7 @@ class TestParseCommandBackupIntegration:
                 "billfox.cli.app._read_config",
                 return_value={
                     "defaults": {
+                        "ocr": {"provider": "docling"},
                         "backup": {
                             "provider": "local",
                             "local_path": str(tmp_path / "backups"),
@@ -199,7 +209,13 @@ class TestParseCommandBackupIntegration:
         mock_pipeline = MagicMock()
         mock_pipeline.run = AsyncMock(return_value=mock_result)
 
-        with patch("billfox.pipeline.Pipeline", return_value=mock_pipeline) as mock_cls:
+        with (
+            patch("billfox.pipeline.Pipeline", return_value=mock_pipeline) as mock_cls,
+            patch(
+                "billfox.cli.app._read_config",
+                return_value={"defaults": {"ocr": {"provider": "docling"}}},
+            ),
+        ):
             result = runner.invoke(
                 app,
                 [
@@ -235,7 +251,10 @@ class TestParseCommandBackupIntegration:
 
         with (
             patch("billfox.pipeline.Pipeline", return_value=mock_pipeline) as mock_cls,
-            patch("billfox.cli.app._read_config", return_value={}),
+            patch(
+                "billfox.cli.app._read_config",
+                return_value={"defaults": {"ocr": {"provider": "docling"}}},
+            ),
         ):
             result = runner.invoke(
                 app,

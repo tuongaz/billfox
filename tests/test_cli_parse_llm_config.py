@@ -70,6 +70,7 @@ class TestParseOllamaConfigWiring:
     def test_ollama_provider_constructs_model_string(self, tmp_path: Path) -> None:
         config = {
             "defaults": {
+                "ocr": {"provider": "docling"},
                 "llm": {"provider": "ollama"},
                 "ollama": {"model": "llama3.2:7b", "base_url": "http://myhost:11434"},
             },
@@ -86,6 +87,7 @@ class TestParseOllamaConfigWiring:
     ) -> None:
         config = {
             "defaults": {
+                "ocr": {"provider": "docling"},
                 "llm": {"provider": "ollama"},
                 "ollama": {"model": "mistral"},
             },
@@ -138,6 +140,7 @@ class TestParseNonOllamaConfigWiring:
     def test_config_llm_model_used_as_default(self, tmp_path: Path) -> None:
         config = {
             "defaults": {
+                "ocr": {"provider": "docling"},
                 "llm": {"provider": "openai", "model": "openai:gpt-4.1-mini"},
             },
         }
@@ -151,6 +154,7 @@ class TestParseNonOllamaConfigWiring:
     def test_anthropic_model_from_config(self, tmp_path: Path) -> None:
         config = {
             "defaults": {
+                "ocr": {"provider": "docling"},
                 "llm": {
                     "provider": "anthropic",
                     "model": "anthropic:claude-sonnet-4-20250514",
@@ -164,7 +168,8 @@ class TestParseNonOllamaConfigWiring:
         assert call_kwargs["model"] == "anthropic:claude-sonnet-4-20250514"
 
     def test_fallback_to_default_when_no_config(self, tmp_path: Path) -> None:
-        result, mock_cls = _run_parse(tmp_path, {})
+        config = {"defaults": {"ocr": {"provider": "docling"}}}
+        result, mock_cls = _run_parse(tmp_path, config)
 
         assert result.exit_code == 0
         call_kwargs = mock_cls.call_args.kwargs
@@ -173,6 +178,7 @@ class TestParseNonOllamaConfigWiring:
     def test_cli_model_overrides_config_model(self, tmp_path: Path) -> None:
         config = {
             "defaults": {
+                "ocr": {"provider": "docling"},
                 "llm": {"provider": "openai", "model": "openai:gpt-4.1-mini"},
             },
         }
