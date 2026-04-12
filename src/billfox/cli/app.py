@@ -448,6 +448,12 @@ from billfox.cli.backup import build_backup_from_config  # noqa: E402
 
 app.command("backup")(backup_command)
 
+# ── Init command ─────────────────────────────────────────────
+
+from billfox.cli.init import init as init_command  # noqa: E402
+
+app.command("init")(init_command)
+
 
 @config_app.command("set")  # type: ignore[untyped-decorator]
 def config_set(
