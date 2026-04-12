@@ -1,0 +1,23 @@
+## Codebase Patterns
+- Use `python3` not `python` to run commands (macOS setup)
+- Pre-existing mypy error in `src/billfox/extract/docling.py:66` (DocumentStream export) - not a blocker
+- Test patterns: use `unittest.mock.patch("pydantic_ai.Agent")` to mock Agent creation, `AsyncMock` for async agent.run()
+- Use `FakeRunResult(output=...)` dataclass pattern for mocking pydantic-ai run results
+- All test classes in `tests/test_parse_llm.py` follow `TestLLMParser*` naming
+
+---
+
+## 2026-04-12 - US-001
+- Already completed before this iteration (load API keys from .env)
+
+---
+
+## 2026-04-12 - US-002
+- What was implemented: Added `anthropic = ["anthropic>=0.40"]` optional dependency extra to pyproject.toml, included it in the `all` extras group, added mypy override for anthropic module
+- Files changed: pyproject.toml, tests/test_parse_llm.py
+- **Learnings for future iterations:**
+  - pydantic-ai routes `anthropic:` model strings natively - no code changes needed in LLMParser, just the dependency
+  - When adding new optional deps, remember to also add mypy overrides if the package lacks type stubs
+  - 247 tests all pass; 3 warnings from aiosqlite event loop cleanup are pre-existing
+
+---
