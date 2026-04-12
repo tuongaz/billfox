@@ -124,7 +124,7 @@
         "Typecheck passes"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "Create src/billfox/cli/init.py. Use typer.prompt() for input and Rich console for formatted output. Register the command in cli/app.py. LLM model strings: openai=openai:gpt-4.1, claude=anthropic:claude-sonnet-4-20250514, ollama=ollama:{user_chosen_model}. The .env template should show lines like OPENAI_API_KEY=your-key-here only for the relevant providers."
     },
     {

@@ -12,6 +12,9 @@
 - `split(":", 1)` on model string handles tags like `llama3.2:7b` correctly
 - Circular imports: `backup.py` → `app.py` is circular; shared factory functions live in `backup.py`, imported by `app.py`
 - `build_backup_from_config(provider, local_path)` is the shared factory for backup provider construction
+- Init wizard uses `_read_config`, `_write_config`, `_get_config_dir` from `cli/app.py` — import inside function to avoid circular imports
+- Use `typer.prompt()` for interactive input and `typer.confirm()` for yes/no in CLI wizards
+- `_prompt_choice()` helper in `init.py` for numbered menu selections
 
 ---
 
@@ -70,5 +73,17 @@
   - `base_url` should be picked up from config even when user passes `--model ollama:something` via CLI (the model is overridden but the base URL is still useful)
   - Mocking pattern for parse command tests: patch `billfox.parse.llm.LLMParser` and `billfox.cli.app._read_config` together, assert on `LLMParser` call kwargs
   - 280 tests all pass after adding 8 new tests
+
+---
+
+## 2026-04-12 - US-007
+- What was implemented: Created `billfox init` setup wizard in `src/billfox/cli/init.py`. Wizard prompts for OCR provider (Docling/Mistral), LLM provider (OpenAI/Claude/Ollama), and backup provider (Local/Google Drive). Ollama selection prompts for base URL and model name. Local backup creates directory. Writes all selections to `~/.billfox/config.toml`. Displays required env vars and `.env` template based on choices. Overwrite confirmation when existing config found.
+- Files changed: src/billfox/cli/init.py (new), src/billfox/cli/app.py
+- **Learnings for future iterations:**
+  - Import `_read_config`, `_write_config`, `_get_config_dir` from `cli/app.py` inside the function body to avoid circular imports at module level
+  - `typer.prompt()` returns str, `typer.confirm()` returns bool — both are synchronous and work in CLI context
+  - `_prompt_choice()` helper pattern: display numbered options, validate input in loop, return 1-based index
+  - Pre-existing lint issue in app.py line 231 (line too long) — not introduced by this change
+  - 280 tests all pass (no new tests in this story — US-010 covers init tests)
 
 ---
