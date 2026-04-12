@@ -117,3 +117,15 @@
   - 289 tests all pass (no new tests — existing tests updated for guard compatibility; US-010 covers guard-specific tests)
 
 ---
+
+## 2026-04-12 - US-010
+- What was implemented: Comprehensive tests for init wizard and config guard in `tests/test_cli_init.py`. 16 new tests covering: Docling+OpenAI+Local config writing with all nested keys, Mistral+Claude+Google Drive config writing, Ollama base URL prompt and config storage, overwrite confirmation (decline/accept/--yes bypass), config guard triggering on extract/parse/backup when config missing, and guard bypass with explicit --extractor/--model flags.
+- Files changed: tests/test_cli_init.py (new)
+- **Learnings for future iterations:**
+  - CliRunner with `mix_stderr=True` (default) captures Rich `Console(stderr=True)` output in `result.output`
+  - For init wizard tests, mock `billfox.cli.app._write_config` and `_read_config` — the init function imports these lazily inside its body
+  - For guard bypass tests, must mock DoclingExtractor/LLMParser/Pipeline to avoid import failures and let the command succeed past the guard
+  - `typer.confirm(default=False)` returns False on "n" input; use in tests to verify overwrite cancellation
+  - 305 tests all pass after adding 16 new tests
+
+---

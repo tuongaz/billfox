@@ -177,7 +177,7 @@
         "Tests pass"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "Create tests/test_cli_init.py. Use tmp_path fixture to isolate config directory. Monkeypatch Path.home() or _get_config_dir() to use tmp_path. For Ollama connectivity test, mock httpx.get."
     }
   ]
