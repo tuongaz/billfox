@@ -1,0 +1,28 @@
+# Ralph Progress Log
+Started: Sun 12 Apr 2026 12:40:41 AEST
+---
+
+## Codebase Patterns
+- Python binary is at `.venv/bin/python` (use full path, `python` is not on PATH)
+- Use `uv pip install -e ".[dev]"` to install all deps including dev extras
+- CLI lives in `src/billfox/cli/app.py`, entry point is `billfox.cli:app` (Typer app)
+- Config dir is `~/.billfox/`, config file is `~/.billfox/config.toml`
+- Tests use `pytest` with `asyncio_mode = "auto"`, runner is `CliRunner` from `typer.testing`
+- Ruff enforces import sorting (I001) - keep `import` blocks properly separated
+- mypy runs in strict mode; use `# type: ignore[...]` sparingly
+- No `--timeout` flag for pytest in this project
+
+---
+
+## 2026-04-12 - US-001
+- Implemented: Load API keys from .env files on CLI startup
+- Files changed:
+  - `pyproject.toml` - added `python-dotenv>=1.0` to cli extra
+  - `src/billfox/cli/app.py` - added dotenv loading at module level (global then local)
+  - `.gitignore` - added `.env`
+  - `tests/test_cli_dotenv.py` - new test file with 6 tests
+- **Learnings for future iterations:**
+  - dotenv loading happens at module import time in app.py; wrapped in try/except ImportError so it's optional
+  - `load_dotenv` with `override=False` (default) means first-loaded value wins; global loads before local
+  - `inspect.getsource()` doesn't work on the app module because Typer replaces `__file__` - read source from disk instead
+---

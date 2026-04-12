@@ -8,6 +8,17 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+# Load .env files early, before any command runs.
+# Global (~/.billfox/.env) first, then project-local (./.env).
+# Existing env vars take precedence (override=False is the default).
+try:
+    from dotenv import load_dotenv as _load_dotenv
+
+    _load_dotenv(Path.home() / ".billfox" / ".env")
+    _load_dotenv(Path(".env"))
+except ImportError:
+    pass
+
 
 def _lazy_typer() -> Any:
     """Lazily import typer with clear error message."""

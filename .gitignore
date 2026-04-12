@@ -11,3 +11,4 @@ wheels/
 receipts/.DS_Store
 .DS_Store
 ralph/.last-branch
+.env
