@@ -12,6 +12,7 @@ _SUPPORTED_MIME_TYPES = frozenset(
         "image/webp",
         "image/tiff",
         "image/heic",
+        "image/bmp",
         "application/pdf",
     }
 )
@@ -20,6 +21,7 @@ _SUPPORTED_MIME_TYPES = frozenset(
 mimetypes.add_type("image/heic", ".heic")
 mimetypes.add_type("image/heic", ".HEIC")
 mimetypes.add_type("image/webp", ".webp")
+mimetypes.add_type("image/bmp", ".bmp")
 
 
 class LocalFileSource:

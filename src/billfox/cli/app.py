@@ -93,7 +93,11 @@ def _build_preprocessors(preprocess: str | None, api_key: str | None = None) -> 
 
 def _build_extractor(extractor: str, api_key: str | None) -> Any:
     """Build an extractor by name."""
-    if extractor == "mistral":
+    if extractor == "docling":
+        from billfox.extract.docling import DoclingExtractor
+
+        return DoclingExtractor()
+    elif extractor == "mistral":
         from billfox.extract.mistral import MistralExtractor
 
         kwargs: dict[str, str] = {}
@@ -102,7 +106,7 @@ def _build_extractor(extractor: str, api_key: str | None) -> Any:
         return MistralExtractor(**kwargs)
     else:
         raise typer.BadParameter(
-            f"Unknown extractor: {extractor!r}. Available: mistral"
+            f"Unknown extractor: {extractor!r}. Available: docling, mistral"
         )
 
 
@@ -137,7 +141,7 @@ def _load_schema(schema_path: str) -> type[Any]:
 @app.command()  # type: ignore[untyped-decorator]
 def extract(
     file: str = typer.Argument(..., help="Path to the document file to extract."),
-    extractor: str = typer.Option("mistral", "--extractor", "-e", help="Extractor to use."),
+    extractor: str = typer.Option("docling", "--extractor", "-e", help="Extractor to use (docling, mistral)."),
     preprocess: str | None = typer.Option(
         None, "--preprocess", "-p", help="Comma-separated preprocessors (e.g. resize).",
     ),
@@ -219,7 +223,7 @@ def parse(
         "--prompt",
         help="System prompt for the LLM parser.",
     ),
-    extractor: str = typer.Option("mistral", "--extractor", "-e", help="Extractor to use."),
+    extractor: str = typer.Option("docling", "--extractor", "-e", help="Extractor to use (docling, mistral)."),
     preprocess: str | None = typer.Option(
         None, "--preprocess", "-p", help="Comma-separated preprocessors.",
     ),

@@ -1,0 +1,184 @@
+{
+  "project": "billfox",
+  "branchName": "ralph/initial-setup-wizard",
+  "description": "Initial setup wizard, Claude/Ollama LLM support, and local backup provider",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Load API keys from .env files on CLI startup",
+      "description": "As a user, I want billfox to automatically load API keys from ~/.billfox/.env so that I can manage my keys in one place without exporting shell variables.",
+      "acceptanceCriteria": [
+        "python-dotenv is added as an explicit dependency in the cli extra in pyproject.toml",
+        "On CLI startup, billfox loads ~/.billfox/.env (global) then ./.env (project-local)",
+        "Existing env vars take precedence over .env values (standard dotenv override=False behavior)",
+        ".env is added to .gitignore",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Foundation story. Load dotenv early in cli/app.py before any command runs. Use dotenv.load_dotenv() with the two paths."
+    },
+    {
+      "id": "US-002",
+      "title": "Add anthropic as optional dependency extra",
+      "description": "As a developer, I want anthropic listed as an optional dependency so that pip install billfox[anthropic] installs everything needed for Claude.",
+      "acceptanceCriteria": [
+        "pyproject.toml has new optional extra: anthropic = [\"anthropic>=0.40\"]",
+        "anthropic is included in the all extras group",
+        "LLMParser works with model string anthropic:claude-sonnet-4-20250514 (verify in a test)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Small change. Only pyproject.toml and a verification test. pydantic-ai already routes anthropic: models."
+    },
+    {
+      "id": "US-003",
+      "title": "Create LocalBackup provider with date-based folders",
+      "description": "As a developer, I want a LocalBackup class that implements the DocumentBackup protocol so that documents can be backed up to a local folder.",
+      "acceptanceCriteria": [
+        "LocalBackup class exists in src/billfox/backup/local.py implementing DocumentBackup protocol",
+        "Constructor takes base_path: str parameter",
+        "Creates date-based folder structure: {base_path}/YYYY/MM/DD/",
+        "Copies document bytes to the date folder using the original filename from source_uri",
+        "Returns BackupResult with uri pointing to the saved file path and provider='local'",
+        "If file with same name exists in target folder, overwrites it",
+        "LocalBackup is re-exported from backup/__init__.py",
+        "Typecheck passes",
+        "Tests cover: folder creation, file writing, date structure, overwrite behavior, protocol conformance"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Follow the same async pattern as GoogleDriveBackup: sync method wrapped in asyncio.to_thread(). Reference backup/google_drive/client.py for the date folder pattern (YYYY/MM/DD with zero-padded month/day using UTC)."
+    },
+    {
+      "id": "US-004",
+      "title": "Add Ollama model prefix support to LLMParser",
+      "description": "As a developer, I want LLMParser to handle ollama:model-name strings so that Ollama models work through pydantic-ai's OpenAI-compatible provider.",
+      "acceptanceCriteria": [
+        "LLMParser.__init__ accepts optional base_url: str | None = None parameter",
+        "When model starts with ollama:, _get_agent() constructs pydantic-ai OpenAIModel with OpenAIProvider(base_url='{base_url}/v1/')",
+        "Model names with tags work correctly (e.g. ollama:llama3.2:7b splits on first colon only to get model name llama3.2:7b)",
+        "Default base URL is http://localhost:11434 when base_url is None and model is ollama:*",
+        "Non-ollama models continue to work unchanged (pass model string directly to Agent)",
+        "Typecheck passes",
+        "Tests cover: ollama prefix parsing, tag handling, default base_url, non-ollama passthrough"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Modify src/billfox/parse/llm.py. Use lazy import: from pydantic_ai.models.openai import OpenAIModel and from pydantic_ai.providers.openai import OpenAIProvider. Verify these import paths exist in pydantic-ai>=0.1."
+    },
+    {
+      "id": "US-005",
+      "title": "Wire backup provider selection into CLI backup command",
+      "description": "As a user, I want billfox backup to use my configured backup provider (local or Google Drive) so that it works based on my config.",
+      "acceptanceCriteria": [
+        "backup command reads defaults.backup.provider from config.toml",
+        "If provider is local, constructs LocalBackup with defaults.backup.local_path",
+        "If provider is google_drive, constructs GoogleDriveBackup (existing behavior)",
+        "If provider config is missing, falls back to existing GoogleDriveBackup behavior",
+        "parse command with --store also uses the configured backup provider",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Modify src/billfox/cli/backup.py to read config and build the appropriate backup instance. Also update the parse command in cli/app.py if it constructs a backup."
+    },
+    {
+      "id": "US-006",
+      "title": "Wire Ollama config into CLI parse command",
+      "description": "As a user, I want billfox parse to use my configured Ollama settings so that I don't have to pass --model and base URL every time.",
+      "acceptanceCriteria": [
+        "parse command reads defaults.llm.provider, defaults.llm.model, and defaults.ollama.base_url from config",
+        "When config LLM provider is ollama, model string is constructed as ollama:{defaults.ollama.model}",
+        "base_url from config is passed to LLMParser constructor",
+        "User can override with --model ollama:other-model on the command line",
+        "When --model is not passed and config has a defaults.llm.model, that model is used as default",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "Modify src/billfox/cli/app.py parse command. Read config with _read_config(), extract nested values. Pass base_url to LLMParser when model starts with ollama:."
+    },
+    {
+      "id": "US-007",
+      "title": "Create billfox init setup wizard",
+      "description": "As a new user, I want to run billfox init to interactively set up my OCR, LLM, and backup preferences so that I can start using billfox immediately.",
+      "acceptanceCriteria": [
+        "billfox init command exists as a top-level CLI command in src/billfox/cli/init.py",
+        "Wizard prompts for OCR provider with numbered choices: 1=Docling (local, free), 2=Mistral (API)",
+        "Wizard prompts for LLM provider: 1=OpenAI, 2=Claude (Anthropic), 3=Ollama (local)",
+        "If Ollama selected, prompts for base URL with default http://localhost:11434",
+        "Wizard prompts for backup provider: 1=Local folder, 2=Google Drive",
+        "If Local folder selected, prompts for folder path and creates directory if needed",
+        "If Google Drive selected, tells user to run billfox auth google-drive",
+        "After selections, displays required env vars based on choices and prints a ~/.billfox/.env template",
+        "Ollama selection shows no API key guidance (local, no keys needed)",
+        "Selections saved to ~/.billfox/config.toml using nested tables: defaults.ocr.provider, defaults.llm.provider, defaults.llm.model, defaults.ollama.base_url, defaults.ollama.model, defaults.backup.provider, defaults.backup.local_path",
+        "Running billfox init again with existing config asks for confirmation before overwriting",
+        "init command is registered in cli/app.py",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "Create src/billfox/cli/init.py. Use typer.prompt() for input and Rich console for formatted output. Register the command in cli/app.py. LLM model strings: openai=openai:gpt-4.1, claude=anthropic:claude-sonnet-4-20250514, ollama=ollama:{user_chosen_model}. The .env template should show lines like OPENAI_API_KEY=your-key-here only for the relevant providers."
+    },
+    {
+      "id": "US-008",
+      "title": "Add Ollama connectivity check to init wizard",
+      "description": "As a user choosing Ollama, I want the wizard to verify my Ollama server is running and show available models so I can pick the right one.",
+      "acceptanceCriteria": [
+        "After entering Ollama base URL, wizard makes HTTP GET to {base_url}/api/tags",
+        "If connected, wizard displays list of available models with their names",
+        "User can select a model from the list by number",
+        "If connection fails, wizard prints warning but still saves config with a default model placeholder",
+        "Uses httpx for the HTTP request with a 5-second timeout",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Modify src/billfox/cli/init.py. httpx is already a transitive dependency. Use httpx.get() synchronously (no need for async in the CLI wizard). Parse response JSON: models are in response.json()['models'], each has a 'name' field."
+    },
+    {
+      "id": "US-009",
+      "title": "Add config completeness guard to CLI commands",
+      "description": "As a user who hasn't run setup, I want billfox to tell me to run billfox init when I try commands that need configuration.",
+      "acceptanceCriteria": [
+        "extract, parse, and backup commands check for config completeness before executing",
+        "If config.toml is missing or defaults.ocr.provider is not set, prints: billfox is not configured yet. Run 'billfox init' to set up.",
+        "Guard only triggers when user does NOT pass explicit CLI flags (--extractor, --model override the need for config)",
+        "Exit with code 1 when config is missing and no CLI overrides provided",
+        "billfox init and billfox config commands are NOT guarded (always work)",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Add a helper function _ensure_configured() in cli/app.py. Call it at the start of extract, parse, and backup commands. Check for the presence of defaults.ocr.provider as the minimum config indicator."
+    },
+    {
+      "id": "US-010",
+      "title": "Tests for init command and integration",
+      "description": "As a developer, I want comprehensive tests for the billfox init wizard so that all paths are verified.",
+      "acceptanceCriteria": [
+        "Tests use CliRunner with input= to simulate user prompts",
+        "Test: selecting Docling + OpenAI + Local backup writes correct config.toml with all nested keys",
+        "Test: selecting Mistral + Claude + Google Drive writes correct config.toml",
+        "Test: selecting Ollama triggers base URL prompt and stores ollama config",
+        "Test: re-running init with existing config asks for confirmation",
+        "Test: config guard triggers on extract/parse/backup when config is missing",
+        "Test: config guard does NOT trigger when explicit --extractor or --model flags are passed",
+        "Typecheck passes",
+        "Tests pass"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "Create tests/test_cli_init.py. Use tmp_path fixture to isolate config directory. Monkeypatch Path.home() or _get_config_dir() to use tmp_path. For Ollama connectivity test, mock httpx.get."
+    }
+  ]
+}

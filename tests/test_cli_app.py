@@ -38,7 +38,7 @@ class TestExtractCommand:
 
         with (
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
-            patch("billfox.extract.mistral.MistralExtractor", return_value=mock_extractor),
+            patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
         ):
             result = runner.invoke(app, ["extract", str(img)])
 
@@ -65,7 +65,7 @@ class TestExtractCommand:
 
         with (
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
-            patch("billfox.extract.mistral.MistralExtractor", return_value=mock_extractor),
+            patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
         ):
             result = runner.invoke(app, ["extract", str(img), "--output", str(out)])
 
@@ -108,7 +108,7 @@ class TestExtractCommand:
 
         with (
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
-            patch("billfox.extract.mistral.MistralExtractor", return_value=mock_extractor),
+            patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
             patch("billfox.preprocess.resize.ResizePreprocessor", return_value=mock_resize),
         ):
             result = runner.invoke(app, ["extract", str(img), "--preprocess", "resize"])
@@ -133,7 +133,7 @@ class TestExtractCommand:
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
             patch("billfox.extract.mistral.MistralExtractor", return_value=mock_extractor) as mock_cls,
         ):
-            result = runner.invoke(app, ["extract", str(img), "--api-key", "test-key"])
+            result = runner.invoke(app, ["extract", str(img), "--extractor", "mistral", "--api-key", "test-key"])
 
         assert result.exit_code == 0
         mock_cls.assert_called_once_with(api_key="test-key")
@@ -153,7 +153,7 @@ class TestExtractCommand:
 
         with (
             patch("billfox.source.local.LocalFileSource", return_value=mock_source),
-            patch("billfox.extract.mistral.MistralExtractor", return_value=mock_extractor),
+            patch("billfox.extract.docling.DoclingExtractor", return_value=mock_extractor),
         ):
             result = runner.invoke(app, ["extract", str(img), "--verbose"])
 
