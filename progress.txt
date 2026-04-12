@@ -61,3 +61,14 @@
   - 272 tests all pass after adding 11 new tests
 
 ---
+
+## 2026-04-12 - US-006
+- What was implemented: Wired Ollama/LLM config into CLI parse command. Changed `--model` default from `"openai:gpt-4.1"` to `None`, added config resolution logic: reads `defaults.llm.provider`, `defaults.llm.model`, `defaults.ollama.model`, and `defaults.ollama.base_url` from `~/.billfox/config.toml`. When provider is `ollama`, constructs `ollama:{model}` string. `base_url` from config is passed to `LLMParser` for any `ollama:` model (including CLI overrides). Falls back to `openai:gpt-4.1` when no config and no CLI flag.
+- Files changed: src/billfox/cli/app.py, tests/test_cli_parse_llm_config.py (new)
+- **Learnings for future iterations:**
+  - Config resolution order: CLI flag > config provider-specific logic > config `defaults.llm.model` > hardcoded fallback
+  - `base_url` should be picked up from config even when user passes `--model ollama:something` via CLI (the model is overridden but the base URL is still useful)
+  - Mocking pattern for parse command tests: patch `billfox.parse.llm.LLMParser` and `billfox.cli.app._read_config` together, assert on `LLMParser` call kwargs
+  - 280 tests all pass after adding 8 new tests
+
+---
