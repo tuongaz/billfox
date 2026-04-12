@@ -53,11 +53,11 @@ def _make_progress_callback() -> Any:
     console = Console(stderr=True)
 
     async def _on_progress(event: ProgressEvent) -> None:
-
-
         stage_name = event.stage.value.lower()
         if event.status == Status.STARTED:
             console.print(f"[bold blue]{stage_name}[/bold blue]...", highlight=False)
+        elif event.status == Status.IN_PROGRESS:
+            console.print(f"  [dim]{escape(event.message or '')}[/dim]", highlight=False)
         elif event.status == Status.COMPLETED:
             console.print(f"[bold blue]{stage_name}[/bold blue] [green]done[/green]", highlight=False)
         elif event.status == Status.FAILED:
@@ -67,6 +67,21 @@ def _make_progress_callback() -> Any:
             )
 
     return _on_progress
+
+
+def _make_step_callback() -> Any:
+    """Create a synchronous step callback for extractor sub-steps, or None if not a TTY."""
+    if not sys.stdout.isatty():
+        return None
+
+    from rich.console import Console
+
+    console = Console(stderr=True)
+
+    def _on_step(message: str) -> None:
+        console.print(f"  [dim]{escape(message)}[/dim]", highlight=False)
+
+    return _on_step
 
 
 def _build_preprocessors(preprocess: str | None, api_key: str | None = None) -> list[Any]:
@@ -168,6 +183,7 @@ def extract(
         logging.basicConfig(level=logging.DEBUG)
 
     on_progress = _make_progress_callback()
+    on_step = _make_step_callback()
 
     async def _run() -> str:
         from billfox._progress import ProgressEvent, Stage, Status
@@ -200,7 +216,7 @@ def extract(
 
         try:
             await _emit(Stage.EXTRACTING, Status.STARTED)
-            result = await ext.extract(document)
+            result = await ext.extract(document, on_step=on_step)
             await _emit(Stage.EXTRACTING, Status.COMPLETED, metadata={"pages": len(result.pages)})
         except Exception as e:
             await _emit(Stage.EXTRACTING, Status.FAILED, message=str(e))
@@ -296,6 +312,7 @@ def parse(
 
     schema_cls = _load_schema(schema)
     on_progress = _make_progress_callback()
+    on_step = _make_step_callback()
 
     async def _run() -> Any:
         from billfox.parse.llm import LLMParser
@@ -338,6 +355,7 @@ def parse(
             store=store_instance,
             backup=backup_instance,
             on_progress=on_progress,
+            on_step=on_step,
         )
 
         doc_id = Path(file).stem if store else None

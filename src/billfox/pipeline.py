@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from billfox._progress import ProgressCallback, ProgressEvent, Stage, Status
 from billfox._types import Document, ExtractionResult
 from billfox.backup._base import DocumentBackup
-from billfox.extract._base import Extractor
+from billfox.extract._base import Extractor, StepCallback
 from billfox.parse._base import Parser
 from billfox.preprocess._base import Preprocessor
 from billfox.source._base import DocumentSource
@@ -34,6 +34,7 @@ class Pipeline(Generic[T]):
     store: DocumentStore[T] | None = None
     backup: DocumentBackup | None = None
     on_progress: ProgressCallback | None = None
+    on_step: StepCallback | None = None
 
     async def _emit(
         self,
@@ -72,7 +73,7 @@ class Pipeline(Generic[T]):
         # EXTRACTING
         try:
             await self._emit(Stage.EXTRACTING, Status.STARTED)
-            result = await self.extractor.extract(document)
+            result = await self.extractor.extract(document, on_step=self.on_step)
             await self._emit(Stage.EXTRACTING, Status.COMPLETED, metadata={"pages": len(result.pages)})
         except Exception as exc:
             await self._emit(Stage.EXTRACTING, Status.FAILED, message=str(exc))
@@ -131,7 +132,7 @@ class Pipeline(Generic[T]):
         # EXTRACTING
         try:
             await self._emit(Stage.EXTRACTING, Status.STARTED)
-            result = await self.extractor.extract(document)
+            result = await self.extractor.extract(document, on_step=self.on_step)
             await self._emit(Stage.EXTRACTING, Status.COMPLETED, metadata={"pages": len(result.pages)})
         except Exception as exc:
             await self._emit(Stage.EXTRACTING, Status.FAILED, message=str(exc))

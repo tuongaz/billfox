@@ -6,6 +6,7 @@ import os
 from typing import Any
 
 from billfox._types import Document, ExtractionResult, Page
+from billfox.extract._base import StepCallback
 
 SUPPORTED_MIME_TYPES: frozenset[str] = frozenset({
     "image/jpeg",
@@ -67,9 +68,19 @@ class MistralExtractor:
             ) from None
         return Mistral(api_key=self._api_key)
 
-    def _ocr_sync(self, document: Document) -> ExtractionResult:
+    def _ocr_sync(
+        self,
+        document: Document,
+        on_step: StepCallback | None,
+    ) -> ExtractionResult:
         """Run OCR synchronously (called via asyncio.to_thread)."""
         _validate_mime(document.mime_type)
+
+        def step(msg: str) -> None:
+            if on_step is not None:
+                on_step(msg)
+
+        step("connecting to Mistral API")
         client = self._get_client()
 
         data_url = _to_data_url(document.content, document.mime_type)
@@ -80,12 +91,14 @@ class MistralExtractor:
         else:
             doc = {"type": "document_url", "document_url": data_url}
 
+        step("running OCR")
         resp = client.ocr.process(
             model=self._model,
             document=doc,
             include_image_base64=True,
         )
 
+        step("extracting pages")
         pages = [
             Page(index=i, markdown=p.markdown)
             for i, p in enumerate(resp.pages)
@@ -94,13 +107,19 @@ class MistralExtractor:
 
         return ExtractionResult(markdown=markdown, pages=pages)
 
-    async def extract(self, document: Document) -> ExtractionResult:
+    async def extract(
+        self,
+        document: Document,
+        *,
+        on_step: StepCallback | None = None,
+    ) -> ExtractionResult:
         """Extract markdown from a document using Mistral OCR.
 
         Args:
             document: The document to extract text from.
+            on_step: Optional callback for sub-step progress messages.
 
         Returns:
             ExtractionResult with markdown content and pages.
         """
-        return await asyncio.to_thread(self._ocr_sync, document)
+        return await asyncio.to_thread(self._ocr_sync, document, on_step)

@@ -19,6 +19,7 @@ class Status(Enum):
     """Status of a pipeline stage."""
 
     STARTED = "STARTED"
+    IN_PROGRESS = "IN_PROGRESS"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 

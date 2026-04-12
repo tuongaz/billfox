@@ -5,6 +5,7 @@ from io import BytesIO
 from typing import Any
 
 from billfox._types import Document, ExtractionResult, Page
+from billfox.extract._base import StepCallback
 
 SUPPORTED_MIME_TYPES: frozenset[str] = frozenset({
     "image/jpeg",
@@ -59,10 +60,19 @@ class DoclingExtractor:
         self._converter = DocumentConverter()
         return self._converter
 
-    def _convert_sync(self, document: Document) -> ExtractionResult:
+    def _convert_sync(
+        self,
+        document: Document,
+        on_step: StepCallback | None,
+    ) -> ExtractionResult:
         """Run conversion synchronously (called via asyncio.to_thread)."""
         _validate_mime(document.mime_type)
 
+        def step(msg: str) -> None:
+            if on_step is not None:
+                on_step(msg)
+
+        step("initializing OCR model")
         converter = self._get_converter()
 
         from docling.datamodel.base_models import DocumentStream
@@ -73,9 +83,10 @@ class DoclingExtractor:
             stream=BytesIO(document.content),
         )
 
+        step("converting document")
         result = converter.convert(stream)
 
-        # Extract per-page markdown (Docling uses 1-based page numbers)
+        step("extracting pages")
         pages: list[Page] = []
         for page_no in sorted(result.document.pages.keys()):
             page_md = result.document.export_to_markdown(page_no=page_no)
@@ -85,13 +96,19 @@ class DoclingExtractor:
 
         return ExtractionResult(markdown=markdown, pages=pages)
 
-    async def extract(self, document: Document) -> ExtractionResult:
+    async def extract(
+        self,
+        document: Document,
+        *,
+        on_step: StepCallback | None = None,
+    ) -> ExtractionResult:
         """Extract markdown from a document using Docling.
 
         Args:
             document: The document to extract text from.
+            on_step: Optional callback for sub-step progress messages.
 
         Returns:
             ExtractionResult with markdown content and pages.
         """
-        return await asyncio.to_thread(self._convert_sync, document)
+        return await asyncio.to_thread(self._convert_sync, document, on_step)

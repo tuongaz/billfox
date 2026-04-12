@@ -112,7 +112,7 @@ class TestPipelineRun:
         assert result == parsed_invoice
         mock_source.load.assert_called_once_with("test.png")
         mock_preprocessor.process.assert_called_once()
-        mock_extractor.extract.assert_called_once_with(preprocessed_document)
+        mock_extractor.extract.assert_called_once_with(preprocessed_document, on_step=None)
         mock_parser.parse.assert_called_once_with(extraction_result.markdown)
         mock_store.save.assert_called_once_with("doc-1", parsed_invoice)
 
@@ -135,7 +135,7 @@ class TestPipelineRun:
         result = await pipeline.run("test.png")
 
         assert result == parsed_invoice
-        mock_extractor.extract.assert_called_once_with(sample_document)
+        mock_extractor.extract.assert_called_once_with(sample_document, on_step=None)
 
     @pytest.mark.asyncio
     async def test_pipeline_without_store(
@@ -228,7 +228,7 @@ class TestPipelineRun:
 
         preprocessor1.process.assert_called_once()
         preprocessor2.process.assert_called_once_with(doc1)
-        mock_extractor.extract.assert_called_once_with(doc2)
+        mock_extractor.extract.assert_called_once_with(doc2, on_step=None)
 
 
 class TestPipelineExtractOnly:
@@ -294,4 +294,4 @@ class TestPipelineExtractOnly:
         await pipeline.extract_only("test.png")
 
         mock_preprocessor.process.assert_called_once()
-        mock_extractor.extract.assert_called_once_with(preprocessed_document)
+        mock_extractor.extract.assert_called_once_with(preprocessed_document, on_step=None)
