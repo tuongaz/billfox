@@ -10,6 +10,8 @@
 - Ollama models use `pydantic_ai.models.openai.OpenAIModel` + `pydantic_ai.providers.openai.OpenAIProvider` with `{base_url}/v1/`
 - For lazy imports in `_get_agent()`, patch at source (`pydantic_ai.models.openai.OpenAIModel`) not at the importing module
 - `split(":", 1)` on model string handles tags like `llama3.2:7b` correctly
+- Circular imports: `backup.py` → `app.py` is circular; shared factory functions live in `backup.py`, imported by `app.py`
+- `build_backup_from_config(provider, local_path)` is the shared factory for backup provider construction
 
 ---
 
@@ -46,5 +48,16 @@
   - Lazy imports inside methods can't be patched at the importing module level (e.g. `billfox.parse.llm.OpenAIModel`) — patch at source (`pydantic_ai.models.openai.OpenAIModel`)
   - `split(":", 1)[1]` preserves everything after first colon, so `ollama:llama3.2:7b` → `llama3.2:7b`
   - 261 tests all pass after adding 7 new Ollama tests
+
+---
+
+## 2026-04-12 - US-005
+- What was implemented: Wired backup provider selection into CLI backup command and parse command. Added `build_backup_from_config()` factory function in `cli/backup.py`. Backup command reads `defaults.backup.provider` from `~/.billfox/config.toml` and constructs LocalBackup or GoogleDriveBackup accordingly. Parse command with `--store` also wires up the configured backup provider via the Pipeline's backup parameter.
+- Files changed: src/billfox/cli/backup.py, src/billfox/cli/app.py, tests/test_cli_backup.py (new)
+- **Learnings for future iterations:**
+  - Circular import avoidance: `backup.py` can't import from `app.py` since `app.py` imports from `backup.py`. Shared logic goes in `backup.py` and gets imported by `app.py`.
+  - For lazy imports (inside functions), always patch at the source module path (e.g. `billfox.backup.google_drive.client.GoogleDriveBackup`), not the importing module.
+  - `_read_backup_config()` helper in backup.py reads config independently using tomllib, avoiding dependency on app.py config helpers.
+  - 272 tests all pass after adding 11 new tests
 
 ---

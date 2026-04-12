@@ -84,7 +84,7 @@
         "Tests pass"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Modify src/billfox/cli/backup.py to read config and build the appropriate backup instance. Also update the parse command in cli/app.py if it constructs a backup."
     },
     {
