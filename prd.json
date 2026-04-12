@@ -67,7 +67,7 @@
         "Tests cover: ollama prefix parsing, tag handling, default base_url, non-ollama passthrough"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Modify src/billfox/parse/llm.py. Use lazy import: from pydantic_ai.models.openai import OpenAIModel and from pydantic_ai.providers.openai import OpenAIProvider. Verify these import paths exist in pydantic-ai>=0.1."
     },
     {

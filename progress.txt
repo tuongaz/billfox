@@ -7,6 +7,9 @@
 - Backup providers follow async pattern: sync method `_backup_sync()` wrapped in `asyncio.to_thread()`
 - Date folders use UTC and zero-padded month/day: `YYYY/MM/DD`
 - Mock `datetime` in backup modules by patching `billfox.backup.<module>.datetime`
+- Ollama models use `pydantic_ai.models.openai.OpenAIModel` + `pydantic_ai.providers.openai.OpenAIProvider` with `{base_url}/v1/`
+- For lazy imports in `_get_agent()`, patch at source (`pydantic_ai.models.openai.OpenAIModel`) not at the importing module
+- `split(":", 1)` on model string handles tags like `llama3.2:7b` correctly
 
 ---
 
@@ -33,5 +36,15 @@
   - `PurePath(source_uri).name` extracts filename from any path format
   - Test pattern: patch `billfox.backup.local.datetime` to control date in tests, set both `.now.return_value` and `.UTC`
   - 254 tests all pass after adding 7 new tests
+
+---
+
+## 2026-04-12 - US-004
+- What was implemented: Added Ollama model prefix support to LLMParser. When model starts with `ollama:`, constructs pydantic-ai `OpenAIModel` with `OpenAIProvider(base_url='{base_url}/v1/')`. Added optional `base_url` parameter, defaults to `http://localhost:11434` for ollama models. Tags in model names (e.g. `llama3.2:7b`) handled via first-colon split.
+- Files changed: src/billfox/parse/llm.py, tests/test_parse_llm.py
+- **Learnings for future iterations:**
+  - Lazy imports inside methods can't be patched at the importing module level (e.g. `billfox.parse.llm.OpenAIModel`) — patch at source (`pydantic_ai.models.openai.OpenAIModel`)
+  - `split(":", 1)[1]` preserves everything after first colon, so `ollama:llama3.2:7b` → `llama3.2:7b`
+  - 261 tests all pass after adding 7 new Ollama tests
 
 ---
