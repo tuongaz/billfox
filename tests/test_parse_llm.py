@@ -143,6 +143,44 @@ class TestLLMParserGetAgent:
             )
 
 
+class TestLLMParserAnthropic:
+    def test_anthropic_model_string_passed_to_agent(self) -> None:
+        parser = LLMParser(
+            model="anthropic:claude-sonnet-4-20250514",
+            output_type=Invoice,
+            system_prompt="Extract invoice data.",
+        )
+        assert parser._model == "anthropic:claude-sonnet-4-20250514"
+
+        with patch("pydantic_ai.Agent") as MockAgent:
+            parser._get_agent()
+            MockAgent.assert_called_once_with(
+                "anthropic:claude-sonnet-4-20250514",
+                output_type=Invoice,
+                system_prompt="Extract invoice data.",
+                retries=1,
+            )
+
+    async def test_anthropic_model_parse_returns_output(self) -> None:
+        parser = LLMParser(
+            model="anthropic:claude-sonnet-4-20250514",
+            output_type=Invoice,
+            system_prompt="Extract invoice data.",
+        )
+
+        expected = Invoice(vendor_name="Acme Corp", total=99.99, date="2025-06-01")
+        fake_result = FakeRunResult(output=expected)
+
+        mock_agent = AsyncMock()
+        mock_agent.run = AsyncMock(return_value=fake_result)
+
+        with patch.object(parser, "_get_agent", return_value=mock_agent):
+            result = await parser.parse("# Invoice\nVendor: Acme Corp\nTotal: $99.99")
+
+        assert result == expected
+        assert isinstance(result, Invoice)
+
+
 class TestLLMParserProtocol:
     def test_conforms_to_parser_protocol(self) -> None:
         parser = LLMParser(

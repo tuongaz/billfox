@@ -17,6 +17,7 @@ mistral = ["mistralai>=1.0"]
 yolo = ["onnxruntime>=1.16", "numpy>=1.24", "Pillow>=10.0"]
 llm = ["pydantic-ai>=0.1"]
 openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.40"]
 store = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.19", "sqlite-vec>=0.1"]
 cli = ["typer>=0.13", "rich>=13.0", "tomli-w>=1.0", "python-dotenv>=1.0"]
 google-drive = ["google-api-python-client>=2.80", "google-auth-httplib2>=0.2", "google-auth-oauthlib>=1.0"]
@@ -26,6 +27,7 @@ all = [
     "billfox[yolo]",
     "billfox[llm]",
     "billfox[openai]",
+    "billfox[anthropic]",
     "billfox[store]",
     "billfox[cli]",
     "billfox[google-drive]",
@@ -73,6 +75,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = "pydantic_ai.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "anthropic.*"
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
