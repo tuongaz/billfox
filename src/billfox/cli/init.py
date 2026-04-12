@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 
 def _lazy_typer() -> Any:
     """Lazily import typer."""
@@ -20,6 +22,17 @@ def _lazy_rich_console() -> Any:
     return Console(stderr=True)
 
 
+def _check_ollama(base_url: str) -> list[str] | None:
+    """Check Ollama connectivity and return list of model names, or None on failure."""
+    try:
+        resp = httpx.get(f"{base_url}/api/tags", timeout=5.0)
+        resp.raise_for_status()
+        models = resp.json().get("models", [])
+        return [m["name"] for m in models]
+    except (httpx.HTTPError, KeyError, ValueError):
+        return None
+
+
 def _prompt_choice(prompt_text: str, choices: list[str], descriptions: list[str]) -> int:
     """Display numbered choices and return the 1-based selection index."""
     typer = _lazy_typer()
@@ -27,7 +40,10 @@ def _prompt_choice(prompt_text: str, choices: list[str], descriptions: list[str]
 
     console.print(f"\n[bold]{prompt_text}[/bold]")
     for i, (choice, desc) in enumerate(zip(choices, descriptions, strict=True), 1):
-        console.print(f"  {i}) {choice} — {desc}")
+        if desc:
+            console.print(f"  {i}) {choice} — {desc}")
+        else:
+            console.print(f"  {i}) {choice}")
 
     while True:
         raw = typer.prompt("Choose", default="1")
@@ -96,7 +112,28 @@ def init(
             "Ollama base URL",
             default="http://localhost:11434",
         )
-        ollama_model_name = typer.prompt("Ollama model name", default="llama3.2")
+
+        console.print(f"\n[dim]Checking Ollama at {ollama_base_url}...[/dim]")
+        available_models = _check_ollama(ollama_base_url)
+
+        if available_models and len(available_models) > 0:
+            console.print(f"[green]Connected! Found {len(available_models)} model(s):[/green]")
+            model_idx = _prompt_choice(
+                "Select a model:",
+                available_models,
+                [""] * len(available_models),
+            )
+            ollama_model_name = available_models[model_idx - 1]
+        else:
+            if available_models is not None:
+                console.print("[yellow]Connected to Ollama but no models found.[/yellow]")
+            else:
+                console.print(
+                    f"[yellow]Could not connect to Ollama at {ollama_base_url}.[/yellow]"
+                )
+            console.print("[dim]You can pull models later with: ollama pull <model>[/dim]")
+            ollama_model_name = typer.prompt("Ollama model name", default="llama3.2")
+
         ollama_model = ollama_model_name
         llm_model = f"ollama:{ollama_model_name}"
 
