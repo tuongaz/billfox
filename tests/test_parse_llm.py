@@ -181,6 +181,130 @@ class TestLLMParserAnthropic:
         assert isinstance(result, Invoice)
 
 
+class TestLLMParserOllama:
+    def test_ollama_prefix_creates_openai_model(self) -> None:
+        parser = LLMParser(
+            model="ollama:llama3.2",
+            output_type=Invoice,
+            system_prompt="Extract.",
+        )
+
+        with (
+            patch("pydantic_ai.Agent") as MockAgent,
+            patch(
+                "pydantic_ai.models.openai.OpenAIModel"
+            ) as MockOpenAIModel,
+            patch(
+                "pydantic_ai.providers.openai.OpenAIProvider"
+            ) as MockOpenAIProvider,
+        ):
+            parser._get_agent()
+            MockOpenAIProvider.assert_called_once_with(
+                base_url="http://localhost:11434/v1/"
+            )
+            MockOpenAIModel.assert_called_once_with(
+                "llama3.2",
+                provider=MockOpenAIProvider.return_value,
+            )
+            MockAgent.assert_called_once_with(
+                MockOpenAIModel.return_value,
+                output_type=Invoice,
+                system_prompt="Extract.",
+                retries=1,
+            )
+
+    def test_ollama_model_with_tag(self) -> None:
+        parser = LLMParser(
+            model="ollama:llama3.2:7b",
+            output_type=Invoice,
+            system_prompt="Extract.",
+        )
+
+        with (
+            patch("pydantic_ai.Agent"),
+            patch(
+                "pydantic_ai.models.openai.OpenAIModel"
+            ) as MockOpenAIModel,
+            patch("pydantic_ai.providers.openai.OpenAIProvider"),
+        ):
+            parser._get_agent()
+            # Split on first colon only: model name should be "llama3.2:7b"
+            assert MockOpenAIModel.call_args[0][0] == "llama3.2:7b"
+
+    def test_ollama_custom_base_url(self) -> None:
+        parser = LLMParser(
+            model="ollama:llama3.2",
+            output_type=Invoice,
+            system_prompt="Extract.",
+            base_url="http://myserver:11434",
+        )
+
+        with (
+            patch("pydantic_ai.Agent"),
+            patch("pydantic_ai.models.openai.OpenAIModel"),
+            patch(
+                "pydantic_ai.providers.openai.OpenAIProvider"
+            ) as MockOpenAIProvider,
+        ):
+            parser._get_agent()
+            MockOpenAIProvider.assert_called_once_with(
+                base_url="http://myserver:11434/v1/"
+            )
+
+    def test_ollama_default_base_url_when_none(self) -> None:
+        parser = LLMParser(
+            model="ollama:llama3.2",
+            output_type=Invoice,
+            system_prompt="Extract.",
+            base_url=None,
+        )
+
+        with (
+            patch("pydantic_ai.Agent"),
+            patch("pydantic_ai.models.openai.OpenAIModel"),
+            patch(
+                "pydantic_ai.providers.openai.OpenAIProvider"
+            ) as MockOpenAIProvider,
+        ):
+            parser._get_agent()
+            MockOpenAIProvider.assert_called_once_with(
+                base_url="http://localhost:11434/v1/"
+            )
+
+    def test_non_ollama_model_passthrough(self) -> None:
+        parser = LLMParser(
+            model="openai:gpt-4.1",
+            output_type=Invoice,
+            system_prompt="Extract.",
+        )
+
+        with patch("pydantic_ai.Agent") as MockAgent:
+            parser._get_agent()
+            MockAgent.assert_called_once_with(
+                "openai:gpt-4.1",
+                output_type=Invoice,
+                system_prompt="Extract.",
+                retries=1,
+            )
+
+    def test_base_url_stored(self) -> None:
+        parser = LLMParser(
+            model="ollama:llama3.2",
+            output_type=Invoice,
+            system_prompt="Extract.",
+            base_url="http://custom:1234",
+        )
+        assert parser._base_url == "http://custom:1234"
+
+    def test_base_url_defaults_to_none(self) -> None:
+        parser = LLMParser(
+            model="openai:gpt-4.1",
+            output_type=Invoice,
+            system_prompt="Extract.",
+        )
+        assert parser._base_url is None
+
+
 class TestLLMParserProtocol:
     def test_conforms_to_parser_protocol(self) -> None:
         parser = LLMParser(
