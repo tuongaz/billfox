@@ -12,3 +12,4 @@ receipts/.DS_Store
 .DS_Store
 ralph/.last-branch
 .env
+.claude/settings.local.json
