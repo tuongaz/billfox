@@ -1,4 +1,4 @@
-.PHONY: test lint format typecheck
+.PHONY: test lint format typecheck build publish
 
 test:
 	python3 -m pytest tests/ -v
@@ -11,3 +11,10 @@ format:
 
 typecheck:
 	python3 -m mypy src/billfox/
+
+build:
+	rm -rf dist
+	uv build --sdist --wheel
+
+publish: build
+	uv publish --token $(PYPI_TOKEN)

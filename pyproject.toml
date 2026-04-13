@@ -8,6 +8,16 @@ dynamic = ["version"]
 description = "Composable document data extraction: load, preprocess, OCR, LLM parse, store with vector search."
 readme = "README.md"
 license = "MIT"
+authors = [{ name = "Tuong Le" }]
+keywords = ["document", "extraction", "ocr", "receipt", "pipeline"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Image Processing",
+]
 requires-python = ">=3.11"
 dependencies = [
     "pydantic>=2.0",
@@ -22,6 +32,11 @@ dependencies = [
     "numpy>=1.24",
     "Pillow>=10.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/billfox-ai/billfox"
+Repository = "https://github.com/billfox-ai/billfox"
+Issues = "https://github.com/billfox-ai/billfox/issues"
 
 [project.optional-dependencies]
 mistral = ["mistralai>=1.0"]
@@ -52,6 +67,21 @@ billfox = "billfox.cli:app"
 
 [tool.hatch.version]
 path = "src/billfox/_version.py"
+
+[tool.hatch.build.targets.sdist]
+exclude = [
+    "receipts/",
+    "ralph/",
+    "tasks/",
+    "tests/",
+    "docs/",
+    ".claude/",
+    ".github/",
+    "Makefile",
+    "mkdocs.yml",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md",
+]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/billfox"]
