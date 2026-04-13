@@ -138,6 +138,38 @@ class TestSearchCommand:
         assert len(parsed) == 2
         assert parsed[0]["score"] > parsed[1]["score"]
 
+    def test_search_default_db_path(self) -> None:
+        """Search uses ~/.billfox/receipts.db by default (--db is optional)."""
+        mock_store_cls = MagicMock()
+        mock_store_cls.return_value.search = AsyncMock(return_value=[])
+
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(app, ["search", "coffee"])
+
+        assert result.exit_code == 0
+        call_kwargs = mock_store_cls.call_args[1]
+        assert call_kwargs["db_path"] == str(Path.home() / ".billfox" / "receipts.db")
+
+    def test_search_uses_receipt_model(self) -> None:
+        """Search command uses Receipt model instead of generic _AnyModel."""
+        from billfox.models.receipt import Receipt
+
+        mock_store_cls = MagicMock()
+        mock_store_cls.return_value.search = AsyncMock(return_value=[])
+
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(app, ["search", "test", "--db", "/tmp/t.db"])
+
+        assert result.exit_code == 0
+        call_kwargs = mock_store_cls.call_args[1]
+        assert call_kwargs["schema"] is Receipt
+
     def test_search_help(self) -> None:
         result = runner.invoke(app, ["search", "--help"])
         assert result.exit_code == 0
@@ -288,6 +320,8 @@ class TestSearchConfigHelp:
         assert "--db" in result.output
         assert "--limit" in result.output
         assert "--mode" in result.output
+        # --db should not be marked as required (has a default now)
+        assert "receipts.db" in result.output
 
     def test_config_help(self) -> None:
         result = runner.invoke(app, ["config", "--help"])

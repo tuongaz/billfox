@@ -227,7 +227,11 @@ def _display_search_results(results: list[Any]) -> None:
 @app.command()  # type: ignore[untyped-decorator]
 def search(
     query: str = typer.Argument(..., help="Search query."),
-    db: str = typer.Option(..., "--db", "-d", help="SQLite database path."),
+    db: str = typer.Option(
+        str(Path.home() / ".billfox" / "receipts.db"),
+        "--db", "-d",
+        help="SQLite database path.",
+    ),
     limit: int = typer.Option(20, "--limit", "-l", help="Maximum number of results."),
     mode: str = typer.Option(
         "hybrid", "--mode", "-m", help="Search mode: hybrid, vector, or bm25.",
@@ -247,19 +251,14 @@ def search(
         )
 
     async def _run() -> list[Any]:
-        from pydantic import BaseModel as _BaseModel
-        from pydantic import ConfigDict
-
+        from billfox.models.receipt import Receipt
         from billfox.store.sqlite import SQLiteDocumentStore
-
-        class _AnyModel(_BaseModel):
-            model_config = ConfigDict(extra="allow")
 
         embedder = _helpers.try_build_embedder()
 
         store_instance: Any = SQLiteDocumentStore(
             db_path=db,
-            schema=_AnyModel,
+            schema=Receipt,
             embedder=embedder,
         )
         return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
