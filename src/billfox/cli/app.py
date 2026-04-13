@@ -146,6 +146,12 @@ from billfox.cli.init import init as init_command  # noqa: E402
 
 app.command("init")(init_command)
 
+# ── llms.txt command ──────────────────────────────────────────
+
+from billfox.cli.llms_txt import llms_txt as llms_txt_command  # noqa: E402
+
+app.command("llms.txt")(llms_txt_command)
+
 
 @config_app.command("set")  # type: ignore[untyped-decorator]
 def config_set(

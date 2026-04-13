@@ -160,10 +160,9 @@ def build_preprocessors(preprocess: str | None, api_key: str | None = None) -> l
 
             preprocessors.append(ResizePreprocessor())
         elif name == "yolo":
-            raise typer.BadParameter(
-                "YOLO preprocessor requires a model_path. "
-                "Use the Python API directly for YOLO preprocessing."
-            )
+            from billfox.preprocess.yolo import YOLOPreprocessor
+
+            preprocessors.append(YOLOPreprocessor())
         else:
             raise typer.BadParameter(
                 f"Unknown preprocessor: {name!r}. Available: resize, yolo"

@@ -308,58 +308,51 @@ wheels = [
 name = "billfox"
 source = { editable = "." }
 dependencies = [
+    { name = "docling" },
+    { name = "httpx" },
+    { name = "numpy" },
+    { name = "onnxruntime" },
+    { name = "pillow" },
     { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "python-ulid" },
+    { name = "rich" },
+    { name = "tomli-w" },
+    { name = "typer" },
 ]
 
 [package.optional-dependencies]
 all = [
     { name = "aiosqlite" },
-    { name = "docling" },
+    { name = "anthropic" },
     { name = "google-api-python-client" },
     { name = "google-auth-httplib2" },
     { name = "google-auth-oauthlib" },
     { name = "mistralai" },
-    { name = "numpy" },
-    { name = "onnxruntime" },
     { name = "openai" },
-    { name = "pillow" },
     { name = "pydantic-ai" },
-    { name = "rich" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlite-vec" },
-    { name = "tomli-w" },
-    { name = "typer" },
 ]
-cli = [
-    { name = "rich" },
-    { name = "tomli-w" },
-    { name = "typer" },
+anthropic = [
+    { name = "anthropic" },
 ]
 dev = [
     { name = "aiosqlite" },
+    { name = "anthropic" },
     { name = "coverage" },
-    { name = "docling" },
     { name = "google-api-python-client" },
     { name = "google-auth-httplib2" },
     { name = "google-auth-oauthlib" },
     { name = "mistralai" },
     { name = "mypy" },
-    { name = "numpy" },
-    { name = "onnxruntime" },
     { name = "openai" },
-    { name = "pillow" },
     { name = "pydantic-ai" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
-    { name = "rich" },
     { name = "ruff" },
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlite-vec" },
-    { name = "tomli-w" },
-    { name = "typer" },
-]
-docling = [
-    { name = "docling" },
 ]
 google-drive = [
     { name = "google-api-python-client" },
@@ -380,21 +373,17 @@ store = [
     { name = "sqlalchemy", extra = ["asyncio"] },
     { name = "sqlite-vec" },
 ]
-yolo = [
-    { name = "numpy" },
-    { name = "onnxruntime" },
-    { name = "pillow" },
-]
 
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.19" },
     { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.19" },
     { name = "aiosqlite", marker = "extra == 'store'", specifier = ">=0.19" },
+    { name = "anthropic", marker = "extra == 'all'", specifier = ">=0.40" },
+    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40" },
+    { name = "anthropic", marker = "extra == 'dev'", specifier = ">=0.40" },
     { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.0" },
-    { name = "docling", marker = "extra == 'all'", specifier = ">=2.0" },
-    { name = "docling", marker = "extra == 'dev'", specifier = ">=2.0" },
-    { name = "docling", marker = "extra == 'docling'", specifier = ">=2.0" },
+    { name = "docling", specifier = ">=2.0" },
     { name = "google-api-python-client", marker = "extra == 'all'", specifier = ">=2.80" },
     { name = "google-api-python-client", marker = "extra == 'dev'", specifier = ">=2.80" },
     { name = "google-api-python-client", marker = "extra == 'google-drive'", specifier = ">=2.80" },
@@ -404,31 +393,26 @@ requires-dist = [
     { name = "google-auth-oauthlib", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "google-auth-oauthlib", marker = "extra == 'google-drive'", specifier = ">=1.0" },
+    { name = "httpx", specifier = ">=0.24" },
     { name = "mistralai", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "mistralai", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5" },
-    { name = "numpy", marker = "extra == 'all'", specifier = ">=1.24" },
-    { name = "numpy", marker = "extra == 'dev'", specifier = ">=1.24" },
-    { name = "numpy", marker = "extra == 'yolo'", specifier = ">=1.24" },
-    { name = "onnxruntime", marker = "extra == 'all'", specifier = ">=1.16" },
-    { name = "onnxruntime", marker = "extra == 'dev'", specifier = ">=1.16" },
-    { name = "onnxruntime", marker = "extra == 'yolo'", specifier = ">=1.16" },
+    { name = "numpy", specifier = ">=1.24" },
+    { name = "onnxruntime", specifier = ">=1.16" },
     { name = "openai", marker = "extra == 'all'", specifier = ">=1.0" },
     { name = "openai", marker = "extra == 'dev'", specifier = ">=1.0" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
-    { name = "pillow", marker = "extra == 'all'", specifier = ">=10.0" },
-    { name = "pillow", marker = "extra == 'dev'", specifier = ">=10.0" },
-    { name = "pillow", marker = "extra == 'yolo'", specifier = ">=10.0" },
+    { name = "pillow", specifier = ">=10.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pydantic-ai", marker = "extra == 'all'", specifier = ">=0.1" },
     { name = "pydantic-ai", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "pydantic-ai", marker = "extra == 'llm'", specifier = ">=0.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
-    { name = "rich", marker = "extra == 'all'", specifier = ">=13.0" },
-    { name = "rich", marker = "extra == 'cli'", specifier = ">=13.0" },
-    { name = "rich", marker = "extra == 'dev'", specifier = ">=13.0" },
+    { name = "python-dotenv", specifier = ">=1.0" },
+    { name = "python-ulid", specifier = ">=3.0" },
+    { name = "rich", specifier = ">=13.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'all'", specifier = ">=2.0" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'dev'", specifier = ">=2.0" },
@@ -436,12 +420,8 @@ requires-dist = [
     { name = "sqlite-vec", marker = "extra == 'all'", specifier = ">=0.1" },
     { name = "sqlite-vec", marker = "extra == 'dev'", specifier = ">=0.1" },
     { name = "sqlite-vec", marker = "extra == 'store'", specifier = ">=0.1" },
-    { name = "tomli-w", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "tomli-w", marker = "extra == 'cli'", specifier = ">=1.0" },
-    { name = "tomli-w", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "typer", marker = "extra == 'all'", specifier = ">=0.13" },
-    { name = "typer", marker = "extra == 'cli'", specifier = ">=0.13" },
-    { name = "typer", marker = "extra == 'dev'", specifier = ">=0.13" },
+    { name = "tomli-w", specifier = ">=1.0" },
+    { name = "typer", specifier = ">=0.13" },
 ]
 
 [[package]]
@@ -691,14 +671,14 @@ name = "cohere"
 version = "6.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "fastavro" },
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "requests" },
-    { name = "tokenizers" },
-    { name = "types-requests" },
-    { name = "typing-extensions" },
+    { name = "fastavro", marker = "sys_platform != 'emscripten'" },
+    { name = "httpx", marker = "sys_platform != 'emscripten'" },
+    { name = "pydantic", marker = "sys_platform != 'emscripten'" },
+    { name = "pydantic-core", marker = "sys_platform != 'emscripten'" },
+    { name = "requests", marker = "sys_platform != 'emscripten'" },
+    { name = "tokenizers", marker = "sys_platform != 'emscripten'" },
+    { name = "types-requests", marker = "sys_platform != 'emscripten'" },
+    { name = "typing-extensions", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/d0/67/7aff8a870889ee931aa19e1deb138691e3cc909ee61e1daea86f3475a818/cohere-6.1.0.tar.gz", hash = "sha256:6a52bb459b71b5e79735412ee1a8e87028c5b3afba050c39815fe03c083249b3", size = 207302 }
 wheels = [
@@ -2924,9 +2904,9 @@ name = "ocrmac"
 version = "1.0.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "click" },
-    { name = "pillow" },
-    { name = "pyobjc-framework-vision" },
+    { name = "click", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pillow", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-vision", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/5e/07/3e15ab404f75875c5e48c47163300eb90b7409044d8711fc3aaf52503f2e/ocrmac-1.0.1.tar.gz", hash = "sha256:507fe5e4cbd67b2d03f6729a52bbc11f9d0b58241134eb958a5daafd4b9d93d9", size = 1454317 }
 wheels = [
@@ -3945,7 +3925,7 @@ name = "pyobjc-framework-cocoa"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
+    { name = "pyobjc-core", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/02/a3/16ca9a15e77c061a9250afbae2eae26f2e1579eb8ca9462ae2d2c71e1169/pyobjc_framework_cocoa-12.1.tar.gz", hash = "sha256:5556c87db95711b985d5efdaaf01c917ddd41d148b1e52a0c66b1a2e2c5c1640", size = 2772191 }
 wheels = [
@@ -3962,8 +3942,8 @@ name = "pyobjc-framework-coreml"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-core", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/30/2d/baa9ea02cbb1c200683cb7273b69b4bee5070e86f2060b77e6a27c2a9d7e/pyobjc_framework_coreml-12.1.tar.gz", hash = "sha256:0d1a4216891a18775c9e0170d908714c18e4f53f9dc79fb0f5263b2aa81609ba", size = 40465 }
 wheels = [
@@ -3980,8 +3960,8 @@ name = "pyobjc-framework-quartz"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
+    { name = "pyobjc-core", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/94/18/cc59f3d4355c9456fc945eae7fe8797003c4da99212dd531ad1b0de8a0c6/pyobjc_framework_quartz-12.1.tar.gz", hash = "sha256:27f782f3513ac88ec9b6c82d9767eef95a5cf4175ce88a1e5a65875fee799608", size = 3159099 }
 wheels = [
@@ -3998,10 +3978,10 @@ name = "pyobjc-framework-vision"
 version = "12.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "pyobjc-core" },
-    { name = "pyobjc-framework-cocoa" },
-    { name = "pyobjc-framework-coreml" },
-    { name = "pyobjc-framework-quartz" },
+    { name = "pyobjc-core", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-cocoa", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-coreml", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "pyobjc-framework-quartz", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/c2/5a/08bb3e278f870443d226c141af14205ff41c0274da1e053b72b11dfc9fb2/pyobjc_framework_vision-12.1.tar.gz", hash = "sha256:a30959100e85dcede3a786c544e621ad6eb65ff6abf85721f805822b8c5fe9b0", size = 59538 }
 wheels = [
@@ -4145,6 +4125,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/52/a9/0c0db8d37b2b8a645666f7fd8accea4c6224e013c42b1d5c17c93590cd06/python_pptx-1.0.2.tar.gz", hash = "sha256:479a8af0eaf0f0d76b6f00b0887732874ad2e3188230315290cd1f9dd9cc7095", size = 10109297 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/d9/4f/00be2196329ebbff56ce564aa94efb0fbc828d00de250b1980de1a34ab49/python_pptx-1.0.2-py3-none-any.whl", hash = "sha256:160838e0b8565a8b1f67947675886e9fea18aa5e795db7ae531606d68e785cba", size = 472788 },
+]
+
+[[package]]
+name = "python-ulid"
+version = "3.1.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/40/7e/0d6c82b5ccc71e7c833aed43d9e8468e1f2ff0be1b3f657a6fcafbb8433d/python_ulid-3.1.0.tar.gz", hash = "sha256:ff0410a598bc5f6b01b602851a3296ede6f91389f913a5d5f8c496003836f636", size = 93175 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6c/a0/4ed6632b70a52de845df056654162acdebaf97c20e3212c559ac43e7216e/python_ulid-3.1.0-py3-none-any.whl", hash = "sha256:e2cdc979c8c877029b4b7a38a6fba3bc4578e4f109a308419ff4d3ccf0a46619", size = 11577 },
 ]
 
 [[package]]
@@ -5309,7 +5298,7 @@ name = "types-requests"
 version = "2.33.0.20260408"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "urllib3" },
+    { name = "urllib3", marker = "sys_platform != 'emscripten'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/69/6a/749dc53a54a3f35842c1f8197b3ca6b54af6d7458a1bfc75f6629b6da666/types_requests-2.33.0.20260408.tar.gz", hash = "sha256:95b9a86376807a216b2fb412b47617b202091c3ea7c078f47cc358d5528ccb7b", size = 23882 }
 wheels = [

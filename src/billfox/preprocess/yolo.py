@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import io
+from pathlib import Path, PurePath
 from typing import Any
 
 from billfox._types import Document
+
+_DEFAULT_MODEL = Path(__file__).parent / "model" / "receipt_crop.onnx"
 
 _IMAGE_MIME_TYPES = frozenset({
     "image/jpeg",
@@ -25,11 +28,11 @@ class YOLOPreprocessor:
 
     def __init__(
         self,
-        model_path: str,
+        model_path: str | None = None,
         confidence: float = 0.25,
         imgsz: int = 640,
     ) -> None:
-        self._model_path = model_path
+        self._model_path = model_path or str(_DEFAULT_MODEL)
         self._confidence = confidence
         self._imgsz = imgsz
         self._session: Any = None
@@ -92,10 +95,12 @@ class YOLOPreprocessor:
         crop_pil.save(buf, format="JPEG")
         cropped_bytes = buf.getvalue()
 
+        cropped_uri = str(PurePath(document.source_uri).with_suffix(".jpg"))
+
         return Document(
             content=cropped_bytes,
             mime_type="image/jpeg",
-            source_uri=document.source_uri,
+            source_uri=cropped_uri,
             metadata={**document.metadata, "preprocessor": "yolo"},
         )
 

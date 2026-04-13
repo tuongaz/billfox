@@ -17,11 +17,14 @@ dependencies = [
     "python-dotenv>=1.0",
     "docling>=2.0",
     "httpx>=0.24",
+    "python-ulid>=3.0",
+    "onnxruntime>=1.16",
+    "numpy>=1.24",
+    "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]
 mistral = ["mistralai>=1.0"]
-yolo = ["onnxruntime>=1.16", "numpy>=1.24", "Pillow>=10.0"]
 llm = ["pydantic-ai>=0.1"]
 openai = ["openai>=1.0"]
 anthropic = ["anthropic>=0.40"]
@@ -29,7 +32,6 @@ store = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.19", "sqlite-vec>=0.1"]
 google-drive = ["google-api-python-client>=2.80", "google-auth-httplib2>=0.2", "google-auth-oauthlib>=1.0"]
 all = [
     "billfox[mistral]",
-    "billfox[yolo]",
     "billfox[llm]",
     "billfox[openai]",
     "billfox[anthropic]",
@@ -53,6 +55,7 @@ path = "src/billfox/_version.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/billfox"]
+artifacts = ["src/billfox/preprocess/model/*.onnx"]
 
 [tool.ruff]
 target-version = "py311"

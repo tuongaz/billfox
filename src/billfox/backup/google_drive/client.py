@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import PurePath
 from typing import Any
 
@@ -174,12 +174,18 @@ class GoogleDriveBackup:
         p = PurePath(file_name)
         return f"{p.stem}_original{p.suffix}" if p.suffix else f"{file_name}_original"
 
-    def _backup_sync(self, document: Document, *, original: Document | None = None) -> BackupResult:
+    def _backup_sync(
+        self,
+        document: Document,
+        *,
+        original: Document | None = None,
+        document_date: date | None = None,
+    ) -> BackupResult:
         """Synchronous backup logic — runs all Drive API calls."""
         root_id = self._ensure_root_folder()
 
-        now = datetime.now(UTC)
-        date_path = f"{now.year}/{now.month:02d}/{now.day:02d}"
+        d = document_date or datetime.now(UTC).date()
+        date_path = f"{d.year}/{d.month:02d}/{d.day:02d}"
         folder_id = self._ensure_folder_path(root_id, date_path)
 
         file_name = PurePath(document.source_uri).name or "document"
@@ -200,14 +206,25 @@ class GoogleDriveBackup:
             metadata={"file_id": result.get("id", ""), "file_name": result.get("name", "")},
         )
 
-    async def backup(self, document: Document, *, original: Document | None = None) -> BackupResult:
+    async def backup(
+        self,
+        document: Document,
+        *,
+        original: Document | None = None,
+        document_date: date | None = None,
+    ) -> BackupResult:
         """Back up a document to Google Drive.
 
-        Creates a date-based folder structure (BillFox/YYYY/MM/DD/) and uploads
-        the document bytes. When *original* is provided, it is also uploaded
-        alongside the main file with an ``_original`` suffix.
+        Creates a date-based folder structure (BillFox/YYYY/MM/DD/) using the
+        *document_date* (e.g. receipt expense date). Falls back to today
+        when *document_date* is not provided.
+
+        When *original* is provided, it is also uploaded alongside the main
+        file with an ``_original`` suffix.
 
         Returns:
             BackupResult with the Google Drive webViewLink as uri.
         """
-        return await asyncio.to_thread(self._backup_sync, document, original=original)
+        return await asyncio.to_thread(
+            self._backup_sync, document, original=original, document_date=document_date,
+        )

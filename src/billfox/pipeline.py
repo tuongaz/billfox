@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import date
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
@@ -103,7 +104,10 @@ class Pipeline(Generic[T]):
         # BACKUP
         if self.backup is not None:
             try:
-                backup_result = await self.backup.backup(document, original=original_document)
+                document_date = self._extract_document_date(parsed)
+                backup_result = await self.backup.backup(
+                    document, original=original_document, document_date=document_date,
+                )
                 if self.store is not None and document_id is not None and hasattr(self.store, "save_file_paths"):
                     await self.store.save_file_paths(
                         document_id,
@@ -156,6 +160,17 @@ class Pipeline(Generic[T]):
                 logger.warning("Backup failed", exc_info=True)
 
         return result
+
+    @staticmethod
+    def _extract_document_date(parsed: T) -> date | None:  # type: ignore[type-var]
+        """Try to extract a date from the parsed model's expense_date field."""
+        raw = getattr(parsed, "expense_date", None)
+        if not isinstance(raw, str):
+            return None
+        try:
+            return date.fromisoformat(raw)
+        except ValueError:
+            return None
 
     async def _preprocess(self, document: Document) -> Document:
         for preprocessor in self.preprocessors:
