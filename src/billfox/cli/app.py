@@ -153,6 +153,14 @@ from billfox.cli.llms_txt import llms_txt as llms_txt_command  # noqa: E402
 app.command("llms.txt")(llms_txt_command)
 
 
+@app.command()  # type: ignore[untyped-decorator]
+def version() -> None:
+    """Show the billfox version."""
+    from billfox._version import __version__
+
+    typer.echo(__version__)
+
+
 @config_app.command("set")  # type: ignore[untyped-decorator]
 def config_set(
     key: str = typer.Argument(..., help="Config key (e.g. api_keys.mistral)."),
