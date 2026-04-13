@@ -285,6 +285,12 @@ from billfox.cli.backup import build_backup_from_config  # noqa: E402
 
 app.command("backup")(backup_command)
 
+# ── Receipt command ──────────────────────────────────────────
+
+from billfox.cli.receipt import receipt as receipt_command  # noqa: E402
+
+app.command("receipt")(receipt_command)
+
 # ── Init command ─────────────────────────────────────────────
 
 from billfox.cli.init import init as init_command  # noqa: E402
