@@ -25,7 +25,7 @@ release:
 	p = pathlib.Path('src/billfox/_version.py'); \
 	text = p.read_text(); \
 	major, minor, patch = re.search(r'(\d+)\.(\d+)\.(\d+)', text).groups(); \
-	new_ver = f'{major}.{int(minor)+1}.0'; \
+	new_ver = f'{major}.{minor}.{int(patch)+1}'; \
 	p.write_text(re.sub(r'\"[\d.]+\"', f'\"{new_ver}\"', text)); \
 	print(f'Bumped version to {new_ver}')"
 	$(MAKE) publish
