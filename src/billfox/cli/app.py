@@ -1,7 +1,6 @@
 """Billfox CLI application."""
 
 import asyncio
-import importlib.util
 import json
 import sys
 from pathlib import Path
@@ -25,34 +24,6 @@ app: Any = typer.Typer(
     help="Composable document data extraction: load, preprocess, OCR, LLM parse, store with vector search.",
     no_args_is_help=True,
 )
-
-
-def _load_schema(schema_path: str) -> type[Any]:
-    """Dynamically load a Pydantic model from path:ClassName format."""
-    if ":" not in schema_path:
-        raise typer.BadParameter(
-            f"Schema must be in 'path:ClassName' format, got: {schema_path!r}"
-        )
-
-    file_path, class_name = schema_path.rsplit(":", 1)
-    path = Path(file_path).resolve()
-
-    if not path.exists():
-        raise typer.BadParameter(f"Schema file not found: {file_path}")
-
-    spec = importlib.util.spec_from_file_location("_billfox_schema", str(path))
-    if spec is None or spec.loader is None:
-        raise typer.BadParameter(f"Cannot load module from: {file_path}")
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    if not hasattr(module, class_name):
-        raise typer.BadParameter(
-            f"Class {class_name!r} not found in {file_path}"
-        )
-
-    return getattr(module, class_name)  # type: ignore[no-any-return]
 
 
 @app.command()  # type: ignore[untyped-decorator]
@@ -140,127 +111,6 @@ def extract(
         sys.stdout.write(markdown)
         if not markdown.endswith("\n"):
             sys.stdout.write("\n")
-
-
-@app.command()  # type: ignore[untyped-decorator]
-def parse(
-    file: str = typer.Argument(..., help="Path to the document file to parse."),
-    schema: str = typer.Option(..., "--schema", "-s", help="Pydantic model in 'path:ClassName' format."),
-    model: str | None = typer.Option(None, "--model", "-m", help="LLM model identifier (reads from config if not set)."),
-    prompt: str = typer.Option(
-        "Extract structured data from this document.",
-        "--prompt",
-        help="System prompt for the LLM parser.",
-    ),
-    extractor: str = typer.Option("docling", "--extractor", "-e", help="Extractor to use (docling, mistral)."),
-    preprocess: str | None = typer.Option(
-        None, "--preprocess", "-p", help="Comma-separated preprocessors.",
-    ),
-    api_key: str | None = typer.Option(None, "--api-key", help="API key for the extractor."),
-    store: str | None = typer.Option(None, "--store", help="SQLite database path for storing results."),
-    output: str | None = typer.Option(
-        None, "--output", "-o", help="Output file path. Defaults to stdout.",
-    ),
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
-) -> None:
-    """Parse a document into structured data using OCR + LLM."""
-    import click as _click
-
-    _ctx = _click.get_current_context()
-    _has_override = (
-        _ctx.get_parameter_source("model") == _click.core.ParameterSource.COMMANDLINE
-        or _ctx.get_parameter_source("extractor") == _click.core.ParameterSource.COMMANDLINE
-    )
-    if not _has_override:
-        _helpers.ensure_configured()
-
-    # Use configured OCR provider when --extractor not passed
-    if _ctx.get_parameter_source("extractor") != _click.core.ParameterSource.COMMANDLINE:
-        config_ocr = _helpers.get_nested(_helpers.read_config(), "defaults.ocr.provider")
-        if config_ocr:
-            extractor = config_ocr
-
-    if verbose:
-        import logging
-
-        logging.basicConfig(level=logging.DEBUG)
-
-    # Resolve model and base_url from config when --model is not passed
-    config = _helpers.read_config()
-    resolved_model, base_url = _helpers.resolve_llm_model(model, config)
-
-    schema_cls = _load_schema(schema)
-    on_progress = _helpers.make_progress_callback()
-    on_step = _helpers.make_step_callback()
-
-    async def _run() -> Any:
-        from billfox.parse.llm import LLMParser
-        from billfox.pipeline import Pipeline
-        from billfox.source.local import LocalFileSource
-
-        source = LocalFileSource()
-        ext = _helpers.build_extractor(extractor, api_key)
-        preprocessors = _helpers.build_preprocessors(preprocess)
-        parser: Any = LLMParser(
-            model=resolved_model,
-            output_type=schema_cls,
-            system_prompt=prompt,
-            base_url=base_url,
-        )
-
-        store_instance = None
-        backup_instance = None
-        if store:
-            from billfox.store.sqlite import SQLiteDocumentStore
-
-            store_instance = SQLiteDocumentStore(
-                db_path=store,
-                schema=schema_cls,
-            )
-
-            # Also set up backup from config when storing
-            config = _helpers.read_config()
-            backup_provider = _helpers.get_nested(config, "defaults.backup.provider")
-            backup_local_path = _helpers.get_nested(config, "defaults.backup.local_path")
-            backup_instance = build_backup_from_config(
-                backup_provider, backup_local_path,
-            )
-
-        pipeline: Any = Pipeline(
-            source=source,
-            extractor=ext,
-            parser=parser,
-            preprocessors=preprocessors,
-            store=store_instance,
-            backup=backup_instance,
-            on_progress=on_progress,
-            on_step=on_step,
-        )
-
-        doc_id = Path(file).stem if store else None
-        return await pipeline.run(file, document_id=doc_id)
-
-    try:
-        result = asyncio.run(_run())
-    except (FileNotFoundError, ValueError, RuntimeError, ImportError) as e:
-
-
-        rprint(f"[red]Error:[/red] {escape(str(e))}")
-        raise typer.Exit(code=1) from None
-
-    output_text = (
-        result.model_dump_json(indent=2) if json_output
-        else json.dumps(result.model_dump(), indent=2)
-    )
-
-    if output:
-        Path(output).write_text(output_text, encoding="utf-8")
-
-        rprint(f"[green]Output written to {output}[/green]")
-    else:
-        sys.stdout.write(output_text)
-        sys.stdout.write("\n")
 
 
 # ── Config sub-app ──────────────────────────────────────────────
