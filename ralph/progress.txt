@@ -1,28 +1,112 @@
 # Ralph Progress Log
-Started: Sun 12 Apr 2026 12:40:41 AEST
+Started: Sun 13 Apr 2026
 ---
 
 ## Codebase Patterns
 - Python binary is at `.venv/bin/python` (use full path, `python` is not on PATH)
 - Use `uv pip install -e ".[dev]"` to install all deps including dev extras
 - CLI lives in `src/billfox/cli/app.py`, entry point is `billfox.cli:app` (Typer app)
+- Shared CLI helpers live in `src/billfox/cli/_helpers.py`; import via `import billfox.cli._helpers as _helpers`
 - Config dir is `~/.billfox/`, config file is `~/.billfox/config.toml`
 - Tests use `pytest` with `asyncio_mode = "auto"`, runner is `CliRunner` from `typer.testing`
 - Ruff enforces import sorting (I001) - keep `import` blocks properly separated
 - mypy runs in strict mode; use `# type: ignore[...]` sparingly
 - No `--timeout` flag for pytest in this project
+- dotenv loading happens at module import time in app.py; wrapped in try/except ImportError so it's optional
+- Models live in `src/billfox/models/` package; import from `billfox.models.receipt`
+- Mock helpers at `billfox.cli._helpers.xxx` (not `billfox.cli.app._xxx`) since `app.py` uses module-level access
+- New CLI commands use import-and-register pattern: `from billfox.cli.xxx import xxx as xxx_command; app.command("xxx")(xxx_command)`
+- Receipt command always creates SQLiteDocumentStore — mock it in tests even when `--store` is not passed
 
 ---
 
-## 2026-04-12 - US-001
-- Implemented: Load API keys from .env files on CLI startup
-- Files changed:
-  - `pyproject.toml` - added `python-dotenv>=1.0` to cli extra
-  - `src/billfox/cli/app.py` - added dotenv loading at module level (global then local)
-  - `.gitignore` - added `.env`
-  - `tests/test_cli_dotenv.py` - new test file with 6 tests
+## 2026-04-13 - US-001
+- Created `Receipt` and `ReceiptItem` Pydantic models in `src/billfox/models/receipt.py`
+- Created `src/billfox/models/__init__.py` with re-exports
+- Created `tests/test_models_receipt.py` with 13 tests covering instantiation, defaults, serialization, JSON roundtrip, validation, and importability
+- Files changed: `src/billfox/models/__init__.py`, `src/billfox/models/receipt.py`, `tests/test_models_receipt.py`
 - **Learnings for future iterations:**
-  - dotenv loading happens at module import time in app.py; wrapped in try/except ImportError so it's optional
-  - `load_dotenv` with `override=False` (default) means first-loaded value wins; global loads before local
-  - `inspect.getsource()` doesn't work on the app module because Typer replaces `__file__` - read source from disk instead
+  - Pydantic v2 is used (2.12.5); use `model_dump()` / `model_validate()` / `model_dump_json()` / `model_validate_json()`
+  - `from __future__ import annotations` is standard in this codebase
+  - Test classes are organized by component (e.g., `TestReceiptItem`, `TestReceipt`, `TestImportability`)
+  - mypy strict mode is on; all new code must be fully typed
+---
+
+## 2026-04-13 - US-002
+- Created `RECEIPT_SYSTEM_PROMPT` constant in `src/billfox/models/prompts.py`
+- Comprehensive receipt extraction prompt covering: document classification, currency handling, business number extraction, item extraction with merging rules, date handling, tax/GST handling, surcharge handling, vendor website handling, invoice/expense number, payment method, tags generation, view tags, country detection, vendor information, total extraction, and validation guidelines
+- Updated `src/billfox/models/__init__.py` to re-export `RECEIPT_SYSTEM_PROMPT`
+- Files changed: `src/billfox/models/prompts.py`, `src/billfox/models/__init__.py`
+- **Learnings for future iterations:**
+  - Prompts live in `src/billfox/models/prompts.py`, import from `billfox.models.prompts`
+  - The prompt references `Receipt` model field names exactly (is_expense, vendor_business_number, etc.)
+  - All references use "Receipt model" not "Expense model"
+---
+
+## 2026-04-13 - US-007
+- Extracted 14 shared CLI helper functions from `cli/app.py` into `cli/_helpers.py`: `ensure_configured`, `make_progress_callback`, `make_step_callback`, `build_preprocessors`, `build_extractor`, `read_config`, `get_config_dir`, `get_config_file`, `get_nested`, `set_nested`, `write_config`, `flatten_config`, `try_build_embedder`, `resolve_llm_model`
+- `app.py` updated to use `import billfox.cli._helpers as _helpers` and `_helpers.xxx()` call style
+- `resolve_llm_model(model, config)` encapsulates model/base_url resolution logic (previously inline in parse command)
+- Test mock paths updated from `billfox.cli.app._xxx` to `billfox.cli._helpers.xxx`
+- Files changed: `src/billfox/cli/_helpers.py` (new), `src/billfox/cli/app.py`, `tests/test_cli_parse_llm_config.py`, `tests/test_cli_search_config.py`
+- **Learnings for future iterations:**
+  - When extracting functions to a new module, use `import module as alias` (not `from module import func`) so that mocking at the source module works for all call sites
+  - Mock paths must match where Python resolves the name at runtime — `billfox.cli._helpers.xxx` for helpers
+  - `_load_schema` and `_display_search_results` stay in `app.py` (schema loader will be removed in US-004, display is command-specific)
+---
+
+## 2026-04-13 - US-003
+- Created `src/billfox/cli/receipt.py` with full `receipt` command following parse command patterns
+- Wired receipt command into `app.py` via `app.command("receipt")(receipt_command)` import pattern
+- Created `tests/test_cli_receipt.py` with 12 tests covering: JSON output, file output, Receipt model+prompt wiring, default store path, explicit store path, OCR provider config, model override, error handling, config guard, document stem as ID, and help output
+- Receipt command always stores to SQLite (defaults to `~/.billfox/receipts.db`)
+- Uses hardcoded `Receipt` model and `RECEIPT_SYSTEM_PROMPT` (no `--schema` or `--prompt` flags)
+- Files changed: `src/billfox/cli/receipt.py` (new), `src/billfox/cli/app.py`, `tests/test_cli_receipt.py` (new)
+- **Learnings for future iterations:**
+  - New CLI commands follow the import-and-register pattern: `from billfox.cli.xxx import xxx as xxx_command; app.command("xxx")(xxx_command)`
+  - Receipt command always creates a SQLiteDocumentStore (unlike parse which only stores when `--store` is passed)
+  - When mocking receipt command, must also mock `billfox.store.sqlite.SQLiteDocumentStore` since store is always created
+  - Pre-existing test failures exist in `test_cli_backup.py` (mock path), `test_cli_init.py`, `test_cli_init_ollama.py` — not caused by receipt changes
+---
+
+## 2026-04-13 - US-004
+- Removed `parse` command from `src/billfox/cli/app.py` (entire function + decorator)
+- Removed `_load_schema()` function from `app.py`
+- Removed `import importlib.util` from `app.py`
+- Removed `TestParseCommand` class (8 tests) from `tests/test_cli_app.py`
+- Removed `TestLoadSchema` class (4 tests) from `tests/test_cli_app.py`
+- Removed `test_parse_help` from `TestHelp` class in `tests/test_cli_app.py`
+- Removed unused `import json` from `tests/test_cli_app.py`
+- Updated module docstring from "extract and parse" to "extract"
+- Files changed: `src/billfox/cli/app.py`, `tests/test_cli_app.py`
+- **Learnings for future iterations:**
+  - `test_cli_parse_llm_config.py` still invokes the removed `parse` command — US-006 will update these to use `receipt` instead
+  - The `build_backup_from_config` import in `app.py` is only used by the backup command registration, not by parse — no dead import after removal
+  - After removing parse, the `--schema` parameter no longer exists anywhere in the CLI
+---
+
+## 2026-04-13 - US-005
+- Updated search command to use `Receipt` model instead of inline `_AnyModel` class
+- Changed `--db` default from required to `~/.billfox/receipts.db`
+- Removed `_AnyModel` class and its `pydantic` imports from search command
+- Added 2 new tests: `test_search_default_db_path` and `test_search_uses_receipt_model`
+- Updated `test_search_help_shows_flags` to verify `receipts.db` appears in help output
+- Files changed: `src/billfox/cli/app.py`, `tests/test_cli_search_config.py`
+- **Learnings for future iterations:**
+  - Typer default values are evaluated at import time — `Path.home()` in default is fine since it's a module-level constant
+  - When switching from required to optional Typer option, change `...` to the default value string
+  - The `_AnyModel` with `extra="allow"` was a generic catch-all; now that we have a dedicated Receipt model, use it directly
+---
+
+## 2026-04-13 - US-006
+- Updated `tests/test_cli_parse_llm_config.py` to invoke `receipt` command instead of `parse`
+- Removed `_make_schema_file` helper and `--schema` args from `_run_parse` (now `_run_receipt`)
+- Added `billfox.store.sqlite.SQLiteDocumentStore` mock (receipt always creates store)
+- Renamed classes from `TestParse*` to `TestReceipt*`
+- Added proper type annotations (`Any` imports) to satisfy mypy strict mode
+- Files changed: `tests/test_cli_parse_llm_config.py`
+- **Learnings for future iterations:**
+  - When converting tests from parse to receipt, the key differences are: no `--schema` flag, must mock `SQLiteDocumentStore`
+  - mypy strict mode requires explicit generic type args — use `dict[str, Any]` and `tuple[Any, MagicMock]` for test helper signatures
+  - Pre-existing mypy errors in `init.py` and `backup.py` (referencing moved helpers) are not caused by this branch's changes
 ---
