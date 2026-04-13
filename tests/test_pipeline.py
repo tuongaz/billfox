@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-from billfox._types import Document, ExtractionResult, Page
+from billfox._types import BackupResult, Document, ExtractionResult, Page
 from billfox.pipeline import Pipeline
 
 
@@ -295,3 +295,88 @@ class TestPipelineExtractOnly:
 
         mock_preprocessor.process.assert_called_once()
         mock_extractor.extract.assert_called_once_with(preprocessed_document, on_step=None)
+
+
+class TestPipelineBackupWithOriginal:
+    """Pipeline passes the original document to backup when preprocessors are used."""
+
+    @pytest.mark.asyncio
+    async def test_backup_receives_original_when_preprocessed(
+        self,
+        mock_source: AsyncMock,
+        mock_extractor: AsyncMock,
+        mock_parser: AsyncMock,
+        mock_preprocessor: AsyncMock,
+        sample_document: Document,
+        preprocessed_document: Document,
+    ) -> None:
+        """Backup is called with original=original_document when preprocessors run."""
+        mock_backup = AsyncMock()
+        mock_backup.backup = AsyncMock(
+            return_value=BackupResult(uri="/backup/test.png", provider="local")
+        )
+
+        pipeline: Pipeline[Invoice] = Pipeline(
+            source=mock_source,
+            extractor=mock_extractor,
+            parser=mock_parser,
+            preprocessors=[mock_preprocessor],
+            backup=mock_backup,
+        )
+
+        await pipeline.run("test.png")
+
+        mock_backup.backup.assert_called_once_with(preprocessed_document, original=sample_document)
+
+    @pytest.mark.asyncio
+    async def test_backup_receives_no_original_without_preprocessors(
+        self,
+        mock_source: AsyncMock,
+        mock_extractor: AsyncMock,
+        mock_parser: AsyncMock,
+        sample_document: Document,
+    ) -> None:
+        """Backup is called with original=None when no preprocessors."""
+        mock_backup = AsyncMock()
+        mock_backup.backup = AsyncMock(
+            return_value=BackupResult(uri="/backup/test.png", provider="local")
+        )
+
+        pipeline: Pipeline[Invoice] = Pipeline(
+            source=mock_source,
+            extractor=mock_extractor,
+            parser=mock_parser,
+            backup=mock_backup,
+        )
+
+        await pipeline.run("test.png")
+
+        mock_backup.backup.assert_called_once_with(sample_document, original=None)
+
+    @pytest.mark.asyncio
+    async def test_extract_only_backup_receives_original(
+        self,
+        mock_source: AsyncMock,
+        mock_extractor: AsyncMock,
+        mock_parser: AsyncMock,
+        mock_preprocessor: AsyncMock,
+        sample_document: Document,
+        preprocessed_document: Document,
+    ) -> None:
+        """extract_only also passes original to backup."""
+        mock_backup = AsyncMock()
+        mock_backup.backup = AsyncMock(
+            return_value=BackupResult(uri="/backup/test.png", provider="local")
+        )
+
+        pipeline: Pipeline[Invoice] = Pipeline(
+            source=mock_source,
+            extractor=mock_extractor,
+            parser=mock_parser,
+            preprocessors=[mock_preprocessor],
+            backup=mock_backup,
+        )
+
+        await pipeline.extract_only("test.png")
+
+        mock_backup.backup.assert_called_once_with(preprocessed_document, original=sample_document)

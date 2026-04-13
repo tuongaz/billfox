@@ -22,6 +22,7 @@ class TestSearchCommand:
 
     def test_search_json_output(self) -> None:
         mock_store = MagicMock()
+        mock_store.close = AsyncMock()
         mock_store.search = AsyncMock(
             return_value=[
                 SearchResult(
@@ -38,7 +39,7 @@ class TestSearchCommand:
             patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
-                app, ["search", "acme", "--db", "/tmp/test.db", "--json"]
+                app, ["receipt", "search", "acme", "--db", "/tmp/test.db", "--json"]
             )
 
         assert result.exit_code == 0
@@ -49,6 +50,7 @@ class TestSearchCommand:
 
     def test_search_table_output(self) -> None:
         mock_store = MagicMock()
+        mock_store.close = AsyncMock()
         mock_store.search = AsyncMock(
             return_value=[
                 SearchResult(
@@ -64,7 +66,7 @@ class TestSearchCommand:
             patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
-                app, ["search", "test", "--db", "/tmp/test.db"]
+                app, ["receipt", "search", "test", "--db", "/tmp/test.db"]
             )
 
         assert result.exit_code == 0
@@ -72,6 +74,7 @@ class TestSearchCommand:
 
     def test_search_no_results(self) -> None:
         mock_store = MagicMock()
+        mock_store.close = AsyncMock()
         mock_store.search = AsyncMock(return_value=[])
 
         with (
@@ -79,13 +82,14 @@ class TestSearchCommand:
             patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
-                app, ["search", "nothing", "--db", "/tmp/test.db"]
+                app, ["receipt", "search", "nothing", "--db", "/tmp/test.db"]
             )
 
         assert result.exit_code == 0
 
     def test_search_with_mode_bm25(self) -> None:
         mock_store = MagicMock()
+        mock_store.close = AsyncMock()
         mock_store.search = AsyncMock(return_value=[])
 
         with (
@@ -94,7 +98,7 @@ class TestSearchCommand:
         ):
             result = runner.invoke(
                 app,
-                ["search", "query", "--db", "/tmp/test.db", "--mode", "bm25"],
+                ["receipt", "search", "query", "--db", "/tmp/test.db", "--mode", "bm25"],
             )
 
         assert result.exit_code == 0
@@ -102,6 +106,7 @@ class TestSearchCommand:
 
     def test_search_with_limit(self) -> None:
         mock_store = MagicMock()
+        mock_store.close = AsyncMock()
         mock_store.search = AsyncMock(return_value=[])
 
         with (
@@ -110,7 +115,7 @@ class TestSearchCommand:
         ):
             result = runner.invoke(
                 app,
-                ["search", "query", "--db", "/tmp/test.db", "--limit", "5"],
+                ["receipt", "search", "query", "--db", "/tmp/test.db", "--limit", "5"],
             )
 
         assert result.exit_code == 0
@@ -118,6 +123,7 @@ class TestSearchCommand:
 
     def test_search_multiple_results_json(self) -> None:
         mock_store = MagicMock()
+        mock_store.close = AsyncMock()
         mock_store.search = AsyncMock(
             return_value=[
                 SearchResult(document_id="d1", data={"a": 1}, score=0.9),
@@ -130,7 +136,7 @@ class TestSearchCommand:
             patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
-                app, ["search", "q", "--db", "/tmp/t.db", "--json"]
+                app, ["receipt", "search", "q", "--db", "/tmp/t.db", "--json"]
             )
 
         assert result.exit_code == 0
@@ -141,13 +147,14 @@ class TestSearchCommand:
     def test_search_default_db_path(self) -> None:
         """Search uses ~/.billfox/receipts.db by default (--db is optional)."""
         mock_store_cls = MagicMock()
+        mock_store_cls.return_value.close = AsyncMock()
         mock_store_cls.return_value.search = AsyncMock(return_value=[])
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
             patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
-            result = runner.invoke(app, ["search", "coffee"])
+            result = runner.invoke(app, ["receipt", "search", "coffee"])
 
         assert result.exit_code == 0
         call_kwargs = mock_store_cls.call_args[1]
@@ -158,20 +165,21 @@ class TestSearchCommand:
         from billfox.models.receipt import Receipt
 
         mock_store_cls = MagicMock()
+        mock_store_cls.return_value.close = AsyncMock()
         mock_store_cls.return_value.search = AsyncMock(return_value=[])
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
             patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
-            result = runner.invoke(app, ["search", "test", "--db", "/tmp/t.db"])
+            result = runner.invoke(app, ["receipt", "search", "test", "--db", "/tmp/t.db"])
 
         assert result.exit_code == 0
         call_kwargs = mock_store_cls.call_args[1]
         assert call_kwargs["schema"] is Receipt
 
     def test_search_help(self) -> None:
-        result = runner.invoke(app, ["search", "--help"])
+        result = runner.invoke(app, ["receipt", "search", "--help"])
         assert result.exit_code == 0
         assert "--db" in result.output
         assert "--limit" in result.output
@@ -304,10 +312,10 @@ class TestConfigCommand:
 class TestSearchConfigHelp:
     """Tests for help output of search and config commands."""
 
-    def test_main_help_includes_search(self) -> None:
+    def test_main_help_includes_receipt(self) -> None:
         result = runner.invoke(app, ["--help"])
         assert result.exit_code == 0
-        assert "search" in result.output.lower()
+        assert "receipt" in result.output.lower()
 
     def test_main_help_includes_config(self) -> None:
         result = runner.invoke(app, ["--help"])
@@ -315,7 +323,7 @@ class TestSearchConfigHelp:
         assert "config" in result.output.lower()
 
     def test_search_help_shows_flags(self) -> None:
-        result = runner.invoke(app, ["search", "--help"])
+        result = runner.invoke(app, ["receipt", "search", "--help"])
         assert result.exit_code == 0
         assert "--db" in result.output
         assert "--limit" in result.output

@@ -8,7 +8,7 @@ import struct
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
-from sqlalchemy import event, select, text
+from sqlalchemy import event, func, select, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -106,6 +106,10 @@ class SQLiteDocumentStore(Generic[T]):
     # Public API
     # ------------------------------------------------------------------
 
+    async def close(self) -> None:
+        """Dispose the engine and release all connections."""
+        await self._engine.dispose()
+
     async def save(self, document_id: str, data: T) -> None:
         """Save a Pydantic model instance, upserting if the ID already exists."""
         await self._ensure_tables()
@@ -138,6 +142,65 @@ class SQLiteDocumentStore(Generic[T]):
             if row is None:
                 return None
             return self._schema.model_validate_json(row.data_json)
+
+    async def save_file_paths(
+        self,
+        document_id: str,
+        *,
+        file_path: str | None = None,
+        original_file_path: str | None = None,
+    ) -> None:
+        """Update the file paths for an existing document."""
+        await self._ensure_tables()
+        async with self._session_factory() as session, session.begin():
+            row = await session.get(DocumentRow, document_id)
+            if row is not None:
+                if file_path is not None:
+                    row.file_path = file_path
+                if original_file_path is not None:
+                    row.original_file_path = original_file_path
+
+    async def get_file_paths(
+        self, document_id: str,
+    ) -> tuple[str | None, str | None]:
+        """Return ``(file_path, original_file_path)`` for a document."""
+        await self._ensure_tables()
+        async with self._session_factory() as session:
+            row = await session.get(DocumentRow, document_id)
+            if row is None:
+                return None, None
+            return row.file_path, row.original_file_path
+
+    async def list_documents(
+        self, *, limit: int = 20, offset: int = 0,
+    ) -> tuple[list[tuple[str, T]], int]:
+        """List documents with pagination, newest first.
+
+        Returns ``(items, total_count)`` where each item is
+        ``(document_id, parsed_model)``.
+        """
+        await self._ensure_tables()
+        async with self._session_factory() as session:
+            total = (
+                await session.execute(
+                    select(func.count()).select_from(DocumentRow)
+                )
+            ).scalar_one()
+
+            rows = (
+                await session.execute(
+                    select(DocumentRow)
+                    .order_by(DocumentRow.created_at.desc())
+                    .limit(limit)
+                    .offset(offset)
+                )
+            ).scalars().all()
+
+            items = [
+                (row.id, self._schema.model_validate_json(row.data_json))
+                for row in rows
+            ]
+            return items, total
 
     async def search(self, query: str, *, limit: int = 20, mode: str = "hybrid") -> list[SearchResult]:
         """Hybrid BM25 + vector search with RRF fusion.

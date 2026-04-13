@@ -182,3 +182,92 @@ class TestLocalBackupResult:
         assert result.provider == "local"
         assert result.metadata == {"file_name": "invoice.pdf"}
         assert result.uri.endswith("invoice.pdf")
+
+
+# ---------------------------------------------------------------------------
+# TestLocalBackupOriginalFile
+# ---------------------------------------------------------------------------
+
+
+class TestLocalBackupOriginalFile:
+    """LocalBackup saves the original file alongside the processed one."""
+
+    @patch("billfox.backup.local.datetime")
+    @pytest.mark.asyncio
+    async def test_saves_original_with_suffix(
+        self,
+        mock_datetime: pytest.fixture,
+        tmp_path: Path,
+    ) -> None:
+        mock_datetime.now.return_value = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+        mock_datetime.UTC = UTC
+
+        processed = Document(content=b"cropped", mime_type="image/jpeg", source_uri="/path/to/receipt.jpg")
+        original = Document(content=b"original", mime_type="image/jpeg", source_uri="/path/to/receipt.jpg")
+
+        backup = LocalBackup(base_path=str(tmp_path))
+        result = await backup.backup(processed, original=original)
+
+        date_folder = tmp_path / "2025" / "06" / "15"
+        assert (date_folder / "receipt.jpg").read_bytes() == b"cropped"
+        assert (date_folder / "receipt_original.jpg").read_bytes() == b"original"
+
+    @patch("billfox.backup.local.datetime")
+    @pytest.mark.asyncio
+    async def test_no_original_when_not_provided(
+        self,
+        mock_datetime: pytest.fixture,
+        tmp_path: Path,
+    ) -> None:
+        mock_datetime.now.return_value = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+        mock_datetime.UTC = UTC
+
+        doc = Document(content=b"data", mime_type="image/png", source_uri="/path/to/receipt.png")
+
+        backup = LocalBackup(base_path=str(tmp_path))
+        await backup.backup(doc)
+
+        date_folder = tmp_path / "2025" / "06" / "15"
+        assert (date_folder / "receipt.png").exists()
+        assert not (date_folder / "receipt_original.png").exists()
+
+    @patch("billfox.backup.local.datetime")
+    @pytest.mark.asyncio
+    async def test_returns_original_uri(
+        self,
+        mock_datetime: pytest.fixture,
+        tmp_path: Path,
+    ) -> None:
+        mock_datetime.now.return_value = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+        mock_datetime.UTC = UTC
+
+        processed = Document(content=b"cropped", mime_type="image/jpeg", source_uri="/path/to/receipt.jpg")
+        original = Document(content=b"original", mime_type="image/jpeg", source_uri="/path/to/receipt.jpg")
+
+        backup = LocalBackup(base_path=str(tmp_path))
+        result = await backup.backup(processed, original=original)
+
+        assert result.original_uri is not None
+        assert result.original_uri.endswith("receipt_original.jpg")
+
+    @patch("billfox.backup.local.datetime")
+    @pytest.mark.asyncio
+    async def test_no_original_uri_when_no_original(
+        self,
+        mock_datetime: pytest.fixture,
+        tmp_path: Path,
+    ) -> None:
+        mock_datetime.now.return_value = datetime(2025, 6, 15, 10, 0, 0, tzinfo=UTC)
+        mock_datetime.UTC = UTC
+
+        doc = Document(content=b"data", mime_type="image/png", source_uri="/path/to/receipt.png")
+
+        backup = LocalBackup(base_path=str(tmp_path))
+        result = await backup.backup(doc)
+
+        assert result.original_uri is None
+
+    def test_original_file_name_helper(self) -> None:
+        assert LocalBackup._original_file_name("receipt.jpg") == "receipt_original.jpg"
+        assert LocalBackup._original_file_name("invoice.pdf") == "invoice_original.pdf"
+        assert LocalBackup._original_file_name("document") == "document_original"

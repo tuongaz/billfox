@@ -54,9 +54,10 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "docling"}},
             }),
             patch("billfox.parse.llm.LLMParser"),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1"])
+            mock_store_cls.return_value.close = AsyncMock()
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         parsed = json.loads(result.output)
@@ -77,9 +78,10 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "docling"}},
             }),
             patch("billfox.parse.llm.LLMParser"),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1", "--json"])
+            mock_store_cls.return_value.close = AsyncMock()
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1", "--json"])
 
         assert result.exit_code == 0
         assert "Coffee Shop" in result.output
@@ -98,10 +100,11 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "docling"}},
             }),
             patch("billfox.parse.llm.LLMParser"),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
+            mock_store_cls.return_value.close = AsyncMock()
             result = runner.invoke(app, [
-                "receipt", str(img),
+                "receipt", "parse", str(img),
                 "--model", "openai:gpt-4.1",
                 "--output", str(out),
             ])
@@ -126,9 +129,10 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "docling"}},
             }),
             patch("billfox.parse.llm.LLMParser", mock_llm_parser_cls),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1"])
+            mock_store_cls.return_value.close = AsyncMock()
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         call_kwargs = mock_llm_parser_cls.call_args.kwargs
@@ -148,6 +152,7 @@ class TestReceiptCommand:
         mock_pipeline.run = AsyncMock(return_value=mock_result)
 
         mock_store_cls = MagicMock()
+        mock_store_cls.return_value.close = AsyncMock()
 
         with (
             patch("billfox.pipeline.Pipeline", return_value=mock_pipeline),
@@ -157,7 +162,7 @@ class TestReceiptCommand:
             patch("billfox.parse.llm.LLMParser"),
             patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
         ):
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         call_kwargs = mock_store_cls.call_args.kwargs
@@ -172,6 +177,7 @@ class TestReceiptCommand:
         mock_pipeline.run = AsyncMock(return_value=mock_result)
 
         mock_store_cls = MagicMock()
+        mock_store_cls.return_value.close = AsyncMock()
 
         with (
             patch("billfox.pipeline.Pipeline", return_value=mock_pipeline),
@@ -182,7 +188,7 @@ class TestReceiptCommand:
             patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
         ):
             result = runner.invoke(app, [
-                "receipt", str(img),
+                "receipt", "parse", str(img),
                 "--model", "openai:gpt-4.1",
                 "--store", db_path,
             ])
@@ -204,11 +210,12 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "mistral"}},
             }),
             patch("billfox.parse.llm.LLMParser"),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
             patch("billfox.cli._helpers.build_extractor") as mock_build_ext,
         ):
+            mock_store_cls.return_value.close = AsyncMock()
             mock_build_ext.return_value = MagicMock()
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         mock_build_ext.assert_called_once_with("mistral", None)
@@ -231,10 +238,11 @@ class TestReceiptCommand:
                 },
             }),
             patch("billfox.parse.llm.LLMParser", mock_llm_parser_cls),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
+            mock_store_cls.return_value.close = AsyncMock()
             result = runner.invoke(app, [
-                "receipt", str(img),
+                "receipt", "parse", str(img),
                 "--model", "anthropic:claude-sonnet-4-20250514",
             ])
 
@@ -254,16 +262,17 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "docling"}},
             }),
             patch("billfox.parse.llm.LLMParser"),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1"])
+            mock_store_cls.return_value.close = AsyncMock()
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 1
         assert "Error" in result.output
 
     def test_receipt_requires_config(self) -> None:
         with patch("billfox.cli._helpers.read_config", return_value={}):
-            result = runner.invoke(app, ["receipt", "/some/file.jpg"])
+            result = runner.invoke(app, ["receipt", "parse", "/some/file.jpg"])
 
         assert result.exit_code == 1
         assert "not configured" in result.output.lower()
@@ -281,9 +290,10 @@ class TestReceiptCommand:
                 "defaults": {"ocr": {"provider": "docling"}},
             }),
             patch("billfox.parse.llm.LLMParser"),
-            patch("billfox.store.sqlite.SQLiteDocumentStore"),
+            patch("billfox.store.sqlite.SQLiteDocumentStore") as mock_store_cls,
         ):
-            result = runner.invoke(app, ["receipt", str(img), "--model", "openai:gpt-4.1"])
+            mock_store_cls.return_value.close = AsyncMock()
+            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         mock_pipeline.run.assert_awaited_once()
@@ -291,13 +301,141 @@ class TestReceiptCommand:
         assert call_kwargs.kwargs["document_id"] == "test"
 
 
+class TestReceiptListCommand:
+    """Tests for the receipt list subcommand."""
+
+    def test_list_json_output(self) -> None:
+        mock_data = MagicMock()
+        mock_data.model_dump.return_value = {
+            "vendor_name": "Acme", "total": 42.0, "currency": "AUD",
+        }
+
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(
+            return_value=([("doc1", mock_data)], 1),
+        )
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/test.db", "--json"]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["total"] == 1
+        assert parsed["page"] == 1
+        assert len(parsed["items"]) == 1
+        assert parsed["items"][0]["document_id"] == "doc1"
+
+    def test_list_empty(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(return_value=([], 0))
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/test.db"]
+            )
+
+        assert result.exit_code == 0
+
+    def test_list_pagination_params(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(return_value=([], 0))
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--page", "3", "--per-page", "10"]
+            )
+
+        assert result.exit_code == 0
+        mock_store.list_documents.assert_awaited_once_with(limit=10, offset=20)
+
+    def test_list_json_pagination_metadata(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(return_value=([], 25))
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--json", "--per-page", "10"]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["total"] == 25
+        assert parsed["total_pages"] == 3
+        assert parsed["per_page"] == 10
+
+    def test_list_help(self) -> None:
+        result = runner.invoke(app, ["receipt", "list", "--help"])
+        assert result.exit_code == 0
+        assert "--page" in result.output
+        assert "--per-page" in result.output
+        assert "--json" in result.output
+        assert "--db" in result.output
+
+
+class TestReceiptGetCommand:
+    """Tests for the receipt get subcommand."""
+
+    def test_get_returns_file_path(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get_file_paths = AsyncMock(
+            return_value=("/backups/2025/06/15/receipt.jpg", "/backups/2025/06/15/receipt_original.jpg"),
+        )
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "get", "doc1", "--db", "/tmp/test.db"]
+            )
+
+        assert result.exit_code == 0
+        assert result.output.strip() == "/backups/2025/06/15/receipt.jpg"
+
+    def test_get_returns_original_path(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get_file_paths = AsyncMock(
+            return_value=("/backups/2025/06/15/receipt.jpg", "/backups/2025/06/15/receipt_original.jpg"),
+        )
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "get", "doc1", "--original", "--db", "/tmp/test.db"]
+            )
+
+        assert result.exit_code == 0
+        assert result.output.strip() == "/backups/2025/06/15/receipt_original.jpg"
+
+    def test_get_no_path_stored(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get_file_paths = AsyncMock(return_value=(None, None))
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "get", "doc1", "--db", "/tmp/test.db"]
+            )
+
+        assert result.exit_code == 1
+
+    def test_get_help(self) -> None:
+        result = runner.invoke(app, ["receipt", "get", "--help"])
+        assert result.exit_code == 0
+        assert "--original" in result.output
+        assert "--db" in result.output
+
+
 class TestReceiptHelp:
     """Tests for receipt help output."""
 
-    def test_receipt_help(self) -> None:
-        result = runner.invoke(app, ["receipt", "--help"])
+    def test_receipt_parse_help(self) -> None:
+        result = runner.invoke(app, ["receipt", "parse", "--help"])
         assert result.exit_code == 0
-        assert "receipt" in result.output.lower()
         assert "--model" in result.output
         assert "--output" in result.output
         assert "--json" in result.output
@@ -306,3 +444,11 @@ class TestReceiptHelp:
         assert "--preprocess" in result.output
         assert "--api-key" in result.output
         assert "--verbose" in result.output
+
+    def test_receipt_subapp_help(self) -> None:
+        result = runner.invoke(app, ["receipt", "--help"])
+        assert result.exit_code == 0
+        assert "parse" in result.output
+        assert "search" in result.output
+        assert "list" in result.output
+        assert "get" in result.output

@@ -90,6 +90,72 @@ async def test_search_returns_empty_list(store: SQLiteDocumentStore[Invoice]) ->
     assert results == []
 
 
+async def test_list_documents_empty(store: SQLiteDocumentStore[Invoice]) -> None:
+    items, total = await store.list_documents()
+    assert items == []
+    assert total == 0
+
+
+async def test_list_documents_returns_all(store: SQLiteDocumentStore[Invoice]) -> None:
+    await store.save("a", Invoice(vendor_name="A", total=1.0))
+    await store.save("b", Invoice(vendor_name="B", total=2.0))
+
+    items, total = await store.list_documents()
+    assert total == 2
+    assert len(items) == 2
+    doc_ids = [doc_id for doc_id, _ in items]
+    assert "a" in doc_ids
+    assert "b" in doc_ids
+
+
+async def test_list_documents_pagination(store: SQLiteDocumentStore[Invoice]) -> None:
+    for i in range(5):
+        await store.save(f"doc-{i}", Invoice(vendor_name=f"V{i}", total=float(i)))
+
+    items_p1, total = await store.list_documents(limit=2, offset=0)
+    assert total == 5
+    assert len(items_p1) == 2
+
+    items_p2, _ = await store.list_documents(limit=2, offset=2)
+    assert len(items_p2) == 2
+
+    items_p3, _ = await store.list_documents(limit=2, offset=4)
+    assert len(items_p3) == 1
+
+    all_ids = [doc_id for doc_id, _ in items_p1 + items_p2 + items_p3]
+    assert len(set(all_ids)) == 5
+
+
+async def test_save_and_get_file_paths(store: SQLiteDocumentStore[Invoice]) -> None:
+    inv = Invoice(vendor_name="Acme", total=10.0)
+    await store.save("doc-fp", inv)
+
+    await store.save_file_paths(
+        "doc-fp",
+        file_path="/backups/2025/06/15/receipt.jpg",
+        original_file_path="/backups/2025/06/15/receipt_original.jpg",
+    )
+
+    fp, ofp = await store.get_file_paths("doc-fp")
+    assert fp == "/backups/2025/06/15/receipt.jpg"
+    assert ofp == "/backups/2025/06/15/receipt_original.jpg"
+
+
+async def test_get_file_paths_missing_doc(store: SQLiteDocumentStore[Invoice]) -> None:
+    fp, ofp = await store.get_file_paths("nonexistent")
+    assert fp is None
+    assert ofp is None
+
+
+async def test_get_file_paths_no_paths_stored(store: SQLiteDocumentStore[Invoice]) -> None:
+    inv = Invoice(vendor_name="X", total=1.0)
+    await store.save("doc-no-fp", inv)
+
+    fp, ofp = await store.get_file_paths("doc-no-fp")
+    assert fp is None
+    assert ofp is None
+
+
 async def test_save_with_embed_fields() -> None:
     """Store with embed_fields but no embedder still works (skips embedding)."""
     s: SQLiteDocumentStore[Invoice] = SQLiteDocumentStore(

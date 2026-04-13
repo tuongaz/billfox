@@ -163,7 +163,7 @@ class TestPipelineBackupIntegration:
 
         assert result == parsed_invoice
         mock_store.save.assert_called_once()
-        mock_backup.backup.assert_called_once_with(sample_document)
+        mock_backup.backup.assert_called_once_with(sample_document, original=None)
 
     @pytest.mark.asyncio
     async def test_extract_only_calls_backup(
@@ -184,7 +184,7 @@ class TestPipelineBackupIntegration:
 
         await pipeline.extract_only("test.png")
 
-        mock_backup.backup.assert_called_once_with(sample_document)
+        mock_backup.backup.assert_called_once_with(sample_document, original=None)
 
     @pytest.mark.asyncio
     async def test_pipeline_continues_when_backup_fails(

@@ -1,4 +1,4 @@
-"""CLI command for receipt parsing."""
+"""CLI sub-app for receipt operations: parse, search, list."""
 
 from __future__ import annotations
 
@@ -14,8 +14,18 @@ from rich.markup import escape
 
 import billfox.cli._helpers as _helpers
 
+receipt_app: Any = typer.Typer(
+    name="receipt",
+    help="Parse, search and list receipts.",
+    no_args_is_help=True,
+)
 
-def receipt(
+
+# ── parse ────────────────────────────────────────────────────────
+
+
+@receipt_app.command()  # type: ignore[untyped-decorator]
+def parse(
     file: str = typer.Argument(..., help="Path to the receipt file to parse."),
     model: str | None = typer.Option(
         None, "--model", "-m", help="LLM model identifier (reads from config if not set).",
@@ -113,7 +123,10 @@ def receipt(
         )
 
         doc_id = Path(file).stem
-        return await pipeline.run(file, document_id=doc_id)
+        try:
+            return await pipeline.run(file, document_id=doc_id)
+        finally:
+            await store_instance.close()
 
     try:
         result = asyncio.run(_run())
@@ -134,3 +147,267 @@ def receipt(
     else:
         sys.stdout.write(output_text)
         sys.stdout.write("\n")
+
+
+# ── search ───────────────────────────────────────────────────────
+
+
+def _display_search_results(results: list[Any]) -> None:
+    """Display search results as a formatted rich table."""
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        if not results:
+            sys.stdout.write("No results found.\n")
+            return
+        for i, r in enumerate(results, 1):
+            sys.stdout.write(
+                f"{i}. {r.document_id} (score: {r.score:.4f})\n"
+            )
+        return
+
+    console = Console()
+    if not results:
+        console.print("[yellow]No results found.[/yellow]")
+        return
+
+    table = Table(title="Search Results")
+    table.add_column("Rank", style="dim")
+    table.add_column("Document ID", style="bold")
+    table.add_column("Score", justify="right")
+    table.add_column("Data")
+
+    for i, r in enumerate(results, 1):
+        data_str = json.dumps(r.data, default=str)
+        if len(data_str) > 80:
+            data_str = data_str[:77] + "..."
+        table.add_row(str(i), r.document_id, f"{r.score:.4f}", data_str)
+
+    console.print(table)
+
+
+@receipt_app.command()  # type: ignore[untyped-decorator]
+def search(
+    query: str = typer.Argument(..., help="Search query."),
+    db: str = typer.Option(
+        str(Path.home() / ".billfox" / "receipts.db"),
+        "--db", "-d",
+        help="SQLite database path.",
+    ),
+    limit: int = typer.Option(20, "--limit", "-l", help="Maximum number of results."),
+    mode: str = typer.Option(
+        "hybrid", "--mode", "-m", help="Search mode: hybrid, vector, or bm25.",
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
+) -> None:
+    """Search stored receipts."""
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    if mode not in ("hybrid", "vector", "bm25"):
+        raise typer.BadParameter(
+            f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
+        )
+
+    async def _run() -> list[Any]:
+        from billfox.models.receipt import Receipt
+        from billfox.store.sqlite import SQLiteDocumentStore
+
+        embedder = _helpers.try_build_embedder()
+
+        store_instance: Any = SQLiteDocumentStore(
+            db_path=db,
+            schema=Receipt,
+            embedder=embedder,
+        )
+        try:
+            return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
+        finally:
+            await store_instance.close()
+
+    try:
+        results = asyncio.run(_run())
+    except Exception as e:
+
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(code=1) from None
+
+    if json_output:
+        output_text = json.dumps(
+            [
+                {
+                    "document_id": r.document_id,
+                    "score": r.score,
+                    "data": r.data,
+                    "signals": dict(r.signals),
+                }
+                for r in results
+            ],
+            indent=2,
+            default=str,
+        )
+        sys.stdout.write(output_text)
+        sys.stdout.write("\n")
+    else:
+        _display_search_results(results)
+
+
+# ── list ─────────────────────────────────────────────────────────
+
+
+@receipt_app.command("list")  # type: ignore[untyped-decorator]
+def list_receipts(
+    db: str = typer.Option(
+        str(Path.home() / ".billfox" / "receipts.db"),
+        "--db", "-d",
+        help="SQLite database path.",
+    ),
+    page: int = typer.Option(1, "--page", "-p", help="Page number (starts at 1)."),
+    per_page: int = typer.Option(20, "--per-page", "-n", help="Items per page."),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
+) -> None:
+    """List stored receipts with pagination."""
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    if page < 1:
+        raise typer.BadParameter("Page must be >= 1.")
+
+    offset = (page - 1) * per_page
+
+    async def _run() -> tuple[list[tuple[str, Any]], int]:
+        from billfox.models.receipt import Receipt
+        from billfox.store.sqlite import SQLiteDocumentStore
+
+        store_instance: Any = SQLiteDocumentStore(
+            db_path=db,
+            schema=Receipt,
+        )
+        try:
+            return await store_instance.list_documents(limit=per_page, offset=offset)  # type: ignore[no-any-return]
+        finally:
+            await store_instance.close()
+
+    try:
+        items, total = asyncio.run(_run())
+    except Exception as e:
+
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(code=1) from None
+
+    total_pages = (total + per_page - 1) // per_page if total > 0 else 1
+
+    if json_output:
+        output_text = json.dumps(
+            {
+                "page": page,
+                "per_page": per_page,
+                "total": total,
+                "total_pages": total_pages,
+                "items": [
+                    {"document_id": doc_id, "data": data.model_dump()}
+                    for doc_id, data in items
+                ],
+            },
+            indent=2,
+            default=str,
+        )
+        sys.stdout.write(output_text)
+        sys.stdout.write("\n")
+    else:
+        _display_list_results(items, page=page, total=total, total_pages=total_pages)
+
+
+def _display_list_results(
+    items: list[tuple[str, Any]],
+    *,
+    page: int,
+    total: int,
+    total_pages: int,
+) -> None:
+    """Display list results as a formatted rich table."""
+    try:
+        from rich.console import Console
+        from rich.table import Table
+    except ImportError:
+        if not items:
+            sys.stdout.write("No receipts found.\n")
+            return
+        for doc_id, data in items:
+            sys.stdout.write(f"{doc_id}: {json.dumps(data.model_dump(), default=str)}\n")
+        sys.stdout.write(f"\nPage {page}/{total_pages} ({total} total)\n")
+        return
+
+    console = Console()
+    if not items:
+        console.print("[yellow]No receipts found.[/yellow]")
+        return
+
+    table = Table(title=f"Receipts — page {page}/{total_pages} ({total} total)")
+    table.add_column("#", style="dim")
+    table.add_column("Document ID", style="bold")
+    table.add_column("Vendor")
+    table.add_column("Total", justify="right")
+    table.add_column("Date")
+    table.add_column("Currency")
+
+    for idx, (doc_id, data) in enumerate(items, 1):
+        d = data.model_dump()
+        table.add_row(
+            str(idx),
+            doc_id,
+            str(d.get("vendor_name") or ""),
+            str(d.get("total") or ""),
+            str(d.get("expense_date") or ""),
+            str(d.get("currency") or ""),
+        )
+
+    console.print(table)
+
+
+# ── get ──────────────────────────────────────────────────────────
+
+
+@receipt_app.command("get")  # type: ignore[untyped-decorator]
+def get_receipt(
+    document_id: str = typer.Argument(..., help="Receipt document ID."),
+    original: bool = typer.Option(False, "--original", "-o", help="Get the original (pre-crop) file instead."),
+    db: str = typer.Option(
+        str(Path.home() / ".billfox" / "receipts.db"),
+        "--db", "-d",
+        help="SQLite database path.",
+    ),
+) -> None:
+    """Print the file path of a stored receipt's cropped or original file."""
+
+    async def _run() -> tuple[str | None, str | None]:
+        from billfox.models.receipt import Receipt
+        from billfox.store.sqlite import SQLiteDocumentStore
+
+        store_instance: Any = SQLiteDocumentStore(db_path=db, schema=Receipt)
+        try:
+            return await store_instance.get_file_paths(document_id)  # type: ignore[no-any-return]
+        finally:
+            await store_instance.close()
+
+    try:
+        file_path, original_file_path = asyncio.run(_run())
+    except Exception as e:
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(code=1) from None
+
+    path = original_file_path if original else file_path
+    if path is None:
+        label = "original" if original else "cropped"
+        rprint(f"[yellow]No {label} file path stored for {document_id!r}.[/yellow]")
+        raise typer.Exit(code=1)
+
+    sys.stdout.write(path)
+    sys.stdout.write("\n")

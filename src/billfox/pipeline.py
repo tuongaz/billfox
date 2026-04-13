@@ -60,10 +60,12 @@ class Pipeline(Generic[T]):
             raise
 
         # PREPROCESSING
+        original_document: Document | None = None
         if self.preprocessors:
             try:
                 for p in self.preprocessors:
                     await self._emit(Stage.PREPROCESSING, Status.STARTED, message=type(p).__name__)
+                original_document = document
                 document = await self._preprocess(document)
                 await self._emit(Stage.PREPROCESSING, Status.COMPLETED)
             except Exception as exc:
@@ -101,7 +103,13 @@ class Pipeline(Generic[T]):
         # BACKUP
         if self.backup is not None:
             try:
-                await self.backup.backup(document)
+                backup_result = await self.backup.backup(document, original=original_document)
+                if self.store is not None and document_id is not None and hasattr(self.store, "save_file_paths"):
+                    await self.store.save_file_paths(
+                        document_id,
+                        file_path=backup_result.uri,
+                        original_file_path=backup_result.original_uri,
+                    )
             except Exception:
                 logger.warning("Backup failed", exc_info=True)
 
@@ -119,10 +127,12 @@ class Pipeline(Generic[T]):
             raise
 
         # PREPROCESSING
+        original_document: Document | None = None
         if self.preprocessors:
             try:
                 for p in self.preprocessors:
                     await self._emit(Stage.PREPROCESSING, Status.STARTED, message=type(p).__name__)
+                original_document = document
                 document = await self._preprocess(document)
                 await self._emit(Stage.PREPROCESSING, Status.COMPLETED)
             except Exception as exc:
@@ -141,7 +151,7 @@ class Pipeline(Generic[T]):
         # BACKUP
         if self.backup is not None:
             try:
-                await self.backup.backup(document)
+                await self.backup.backup(document, original=original_document)
             except Exception:
                 logger.warning("Backup failed", exc_info=True)
 

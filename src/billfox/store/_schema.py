@@ -27,6 +27,8 @@ class DocumentRow(Base):
     schema_name: Mapped[str] = mapped_column(String, nullable=False)
     data_json: Mapped[str] = mapped_column(Text, nullable=False)
     source_uri: Mapped[str | None] = mapped_column(String, nullable=True)
+    file_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    original_file_path: Mapped[str | None] = mapped_column(String, nullable=True)
     raw_markdown: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime,

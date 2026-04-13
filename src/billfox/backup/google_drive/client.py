@@ -168,7 +168,13 @@ class GoogleDriveBackup:
             .execute()
         )
 
-    def _backup_sync(self, document: Document) -> BackupResult:
+    @staticmethod
+    def _original_file_name(file_name: str) -> str:
+        """Insert '_original' before the file extension."""
+        p = PurePath(file_name)
+        return f"{p.stem}_original{p.suffix}" if p.suffix else f"{file_name}_original"
+
+    def _backup_sync(self, document: Document, *, original: Document | None = None) -> BackupResult:
         """Synchronous backup logic — runs all Drive API calls."""
         root_id = self._ensure_root_folder()
 
@@ -179,20 +185,29 @@ class GoogleDriveBackup:
         file_name = PurePath(document.source_uri).name or "document"
         result = self._upload_or_update(document.content, file_name, document.mime_type, folder_id)
 
+        original_uri: str | None = None
+        if original is not None:
+            original_name = self._original_file_name(file_name)
+            original_result = self._upload_or_update(
+                original.content, original_name, original.mime_type, folder_id,
+            )
+            original_uri = original_result.get("webViewLink", "")
+
         return BackupResult(
             uri=result.get("webViewLink", ""),
             provider="google_drive",
+            original_uri=original_uri,
             metadata={"file_id": result.get("id", ""), "file_name": result.get("name", "")},
         )
 
-    async def backup(self, document: Document) -> BackupResult:
+    async def backup(self, document: Document, *, original: Document | None = None) -> BackupResult:
         """Back up a document to Google Drive.
 
         Creates a date-based folder structure (BillFox/YYYY/MM/DD/) and uploads
-        the original document bytes. If a file with the same name exists in the
-        target folder, it is updated instead of duplicated.
+        the document bytes. When *original* is provided, it is also uploaded
+        alongside the main file with an ``_original`` suffix.
 
         Returns:
             BackupResult with the Google Drive webViewLink as uri.
         """
-        return await asyncio.to_thread(self._backup_sync, document)
+        return await asyncio.to_thread(self._backup_sync, document, original=original)

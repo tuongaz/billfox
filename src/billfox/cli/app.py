@@ -1,7 +1,6 @@
 """Billfox CLI application."""
 
 import asyncio
-import json
 import sys
 from pathlib import Path
 from typing import Any
@@ -135,11 +134,11 @@ from billfox.cli.backup import build_backup_from_config  # noqa: E402
 
 app.command("backup")(backup_command)
 
-# ── Receipt command ──────────────────────────────────────────
+# ── Receipt sub-app ─────────────────────────────────────────
 
-from billfox.cli.receipt import receipt as receipt_command  # noqa: E402
+from billfox.cli.receipt import receipt_app  # noqa: E402
 
-app.command("receipt")(receipt_command)
+app.add_typer(receipt_app)
 
 # ── Init command ─────────────────────────────────────────────
 
@@ -186,106 +185,3 @@ def config_list() -> None:
         rprint(f"[bold]{k}[/bold] = {v}")
 
 
-def _display_search_results(results: list[Any]) -> None:
-    """Display search results as a formatted rich table."""
-    try:
-        from rich.console import Console
-        from rich.table import Table
-    except ImportError:
-        if not results:
-            sys.stdout.write("No results found.\n")
-            return
-        for i, r in enumerate(results, 1):
-            sys.stdout.write(
-                f"{i}. {r.document_id} (score: {r.score:.4f})\n"
-            )
-        return
-
-    console = Console()
-    if not results:
-        console.print("[yellow]No results found.[/yellow]")
-        return
-
-    table = Table(title="Search Results")
-    table.add_column("Rank", style="dim")
-    table.add_column("Document ID", style="bold")
-    table.add_column("Score", justify="right")
-    table.add_column("Data")
-
-    for i, r in enumerate(results, 1):
-        data_str = json.dumps(r.data, default=str)
-        if len(data_str) > 80:
-            data_str = data_str[:77] + "..."
-        table.add_row(str(i), r.document_id, f"{r.score:.4f}", data_str)
-
-    console.print(table)
-
-
-# ── Search command ──────────────────────────────────────────────
-
-
-@app.command()  # type: ignore[untyped-decorator]
-def search(
-    query: str = typer.Argument(..., help="Search query."),
-    db: str = typer.Option(
-        str(Path.home() / ".billfox" / "receipts.db"),
-        "--db", "-d",
-        help="SQLite database path.",
-    ),
-    limit: int = typer.Option(20, "--limit", "-l", help="Maximum number of results."),
-    mode: str = typer.Option(
-        "hybrid", "--mode", "-m", help="Search mode: hybrid, vector, or bm25.",
-    ),
-    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
-) -> None:
-    """Search stored documents."""
-    if verbose:
-        import logging
-
-        logging.basicConfig(level=logging.DEBUG)
-
-    if mode not in ("hybrid", "vector", "bm25"):
-        raise typer.BadParameter(
-            f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
-        )
-
-    async def _run() -> list[Any]:
-        from billfox.models.receipt import Receipt
-        from billfox.store.sqlite import SQLiteDocumentStore
-
-        embedder = _helpers.try_build_embedder()
-
-        store_instance: Any = SQLiteDocumentStore(
-            db_path=db,
-            schema=Receipt,
-            embedder=embedder,
-        )
-        return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
-
-    try:
-        results = asyncio.run(_run())
-    except Exception as e:
-
-
-        rprint(f"[red]Error:[/red] {escape(str(e))}")
-        raise typer.Exit(code=1) from None
-
-    if json_output:
-        output_text = json.dumps(
-            [
-                {
-                    "document_id": r.document_id,
-                    "score": r.score,
-                    "data": r.data,
-                    "signals": dict(r.signals),
-                }
-                for r in results
-            ],
-            indent=2,
-            default=str,
-        )
-        sys.stdout.write(output_text)
-        sys.stdout.write("\n")
-    else:
-        _display_search_results(results)

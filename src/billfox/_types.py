@@ -46,4 +46,5 @@ class BackupResult:
 
     uri: str
     provider: str
+    original_uri: str | None = None
     metadata: dict[str, str] = field(default_factory=dict)
