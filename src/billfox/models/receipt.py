@@ -18,8 +18,6 @@ class ReceiptItem(BaseModel):
 class Receipt(BaseModel):
     """Structured receipt data extracted from a document."""
 
-    is_expense: bool
-    invalid_receipt_reason: str | None = None
     expense_number: str | None = None
     expense_date: str | None = None
     vendor_name: str | None = None
@@ -39,3 +37,20 @@ class Receipt(BaseModel):
     items: list[ReceiptItem] = []
     tags: list[str] = []
     view_tags: list[str] = []
+
+    def search_text(self) -> str:
+        """Build composite text for search indexing (BM25 + vector)."""
+        parts: list[str] = []
+        if self.vendor_name:
+            parts.append(f"Vendor: {self.vendor_name}")
+        if self.invoice_number:
+            parts.append(f"Invoice: {self.invoice_number}")
+        if self.items:
+            descs = ", ".join(
+                item.description for item in self.items if item.description
+            )
+            if descs:
+                parts.append(f"Items: {descs}")
+        if self.tags:
+            parts.append(f"Tags: {' '.join(self.tags)}")
+        return "\n".join(parts)

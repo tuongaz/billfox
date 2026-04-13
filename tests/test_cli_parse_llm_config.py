@@ -29,22 +29,29 @@ def _run_receipt(
     img = _make_test_file(tmp_path)
 
     mock_result = MagicMock()
-    mock_result.model_dump.return_value = {"is_expense": True, "vendor_name": "Test"}
+    mock_result.vendor_name = "Test"
+    mock_result.total = 10.0
+    mock_result.items = []
+    mock_result.model_dump.return_value = {"vendor_name": "Test"}
 
     mock_pipeline = MagicMock()
     mock_pipeline.run = AsyncMock(return_value=mock_result)
 
     mock_llm_parser_cls = MagicMock()
 
-    args = ["receipt", str(img)]
+    args = ["receipt", "parse", str(img)]
     if extra_args:
         args.extend(extra_args)
+
+    mock_store = MagicMock()
+    mock_store.close = AsyncMock()
+    mock_store.delete = AsyncMock()
 
     with (
         patch("billfox.pipeline.Pipeline", return_value=mock_pipeline),
         patch("billfox.cli._helpers.read_config", return_value=config),
         patch("billfox.parse.llm.LLMParser", mock_llm_parser_cls) as mock_cls,
-        patch("billfox.store.sqlite.SQLiteDocumentStore"),
+        patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
     ):
         result = runner.invoke(app, args)
 

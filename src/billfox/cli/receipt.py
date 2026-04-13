@@ -1,4 +1,4 @@
-"""CLI sub-app for receipt operations: parse, search, list."""
+"""CLI sub-app for receipt operations: parse, search, list, get, delete, edit."""
 
 from __future__ import annotations
 
@@ -14,9 +14,11 @@ from rich.markup import escape
 
 import billfox.cli._helpers as _helpers
 
+RECEIPT_EMBED_FIELDS = ["search_text"]
+
 receipt_app: Any = typer.Typer(
     name="receipt",
-    help="Parse, search and list receipts.",
+    help="Parse, search, list, delete and edit receipts.",
     no_args_is_help=True,
 )
 
@@ -86,6 +88,9 @@ def parse(
         source = LocalFileSource()
         ext = _helpers.build_extractor(extractor, api_key)
         preprocessors = _helpers.build_preprocessors(preprocess)
+        # Always crop receipts with YOLO + resize when no --preprocess specified
+        if not preprocessors:
+            preprocessors = _helpers.build_preprocessors("yolo,resize")
         parser: Any = LLMParser(
             model=resolved_model,
             output_type=Receipt,
@@ -95,9 +100,12 @@ def parse(
 
         from billfox.store.sqlite import SQLiteDocumentStore
 
+        embedder = _helpers.try_build_embedder()
         store_instance: Any = SQLiteDocumentStore(
             db_path=db_path,
             schema=Receipt,
+            embedder=embedder,
+            embed_fields=RECEIPT_EMBED_FIELDS,
         )
 
         # Set up backup from config when storing
@@ -122,9 +130,16 @@ def parse(
             on_step=on_step,
         )
 
-        doc_id = Path(file).stem
+        from billfox._id import generate_id
+
+        doc_id = generate_id()
         try:
-            return await pipeline.run(file, document_id=doc_id)
+            parsed = await pipeline.run(file, document_id=doc_id)
+            # Remove invalid receipts (no vendor and no total and no items)
+            if not parsed.vendor_name and parsed.total is None and not parsed.items:
+                await store_instance.delete(doc_id)
+                return None
+            return parsed
         finally:
             await store_instance.close()
 
@@ -134,6 +149,10 @@ def parse(
 
         rprint(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(code=1) from None
+
+    if result is None:
+        rprint("[yellow]Document is not a valid receipt. Skipping.[/yellow]")
+        raise typer.Exit(code=0)
 
     output_text = (
         result.model_dump_json(indent=2) if json_output
@@ -223,6 +242,7 @@ def search(
             db_path=db,
             schema=Receipt,
             embedder=embedder,
+            embed_fields=RECEIPT_EMBED_FIELDS,
         )
         try:
             return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
@@ -410,4 +430,167 @@ def get_receipt(
         raise typer.Exit(code=1)
 
     sys.stdout.write(path)
+    sys.stdout.write("\n")
+
+
+# ── delete ────────────────────────────────────────────────────────
+
+
+@receipt_app.command("delete")  # type: ignore[untyped-decorator]
+def delete_receipt(
+    document_id: str = typer.Argument(..., help="Receipt document ID to delete."),
+    db: str = typer.Option(
+        str(Path.home() / ".billfox" / "receipts.db"),
+        "--db", "-d",
+        help="SQLite database path.",
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
+) -> None:
+    """Delete a stored receipt by document ID."""
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    async def _run() -> bool:
+        from billfox.models.receipt import Receipt
+        from billfox.store.sqlite import SQLiteDocumentStore
+
+        store_instance: Any = SQLiteDocumentStore(db_path=db, schema=Receipt)
+        try:
+            existing = await store_instance.get(document_id)
+            if existing is None:
+                return False
+            await store_instance.delete(document_id)
+            return True
+        finally:
+            await store_instance.close()
+
+    try:
+        deleted = asyncio.run(_run())
+    except Exception as e:
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(code=1) from None
+
+    if not deleted:
+        if json_output:
+            sys.stdout.write(json.dumps({"error": "not_found", "document_id": document_id}))
+            sys.stdout.write("\n")
+        else:
+            rprint(f"[yellow]Receipt {document_id!r} not found.[/yellow]")
+        raise typer.Exit(code=1)
+
+    if json_output:
+        sys.stdout.write(json.dumps({"deleted": True, "document_id": document_id}))
+        sys.stdout.write("\n")
+    else:
+        rprint(f"[green]Deleted receipt {document_id!r}.[/green]")
+
+
+# ── edit ──────────────────────────────────────────────────────────
+
+@receipt_app.command("edit")  # type: ignore[untyped-decorator]
+def edit_receipt(
+    document_id: str = typer.Argument(..., help="Receipt document ID to edit."),
+    data: str | None = typer.Option(None, "--data", help="JSON string with fields to update."),
+    vendor_name: str | None = typer.Option(None, "--vendor-name", help="Vendor name."),
+    total: float | None = typer.Option(None, "--total", help="Total amount."),
+    expense_date: str | None = typer.Option(None, "--expense-date", help="Expense date."),
+    currency: str | None = typer.Option(None, "--currency", help="Currency code."),
+    tax_amount: float | None = typer.Option(None, "--tax-amount", help="Tax amount."),
+    tax_rate: float | None = typer.Option(None, "--tax-rate", help="Tax rate."),
+    payment_method: str | None = typer.Option(None, "--payment-method", help="Payment method."),
+    invoice_number: str | None = typer.Option(None, "--invoice-number", help="Invoice number."),
+    tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags."),
+    db: str = typer.Option(
+        str(Path.home() / ".billfox" / "receipts.db"),
+        "--db", "-d",
+        help="SQLite database path.",
+    ),
+    json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
+) -> None:
+    """Edit fields of a stored receipt."""
+    if verbose:
+        import logging
+
+        logging.basicConfig(level=logging.DEBUG)
+
+    # Build updates from --data JSON
+    updates: dict[str, Any] = {}
+    if data is not None:
+        try:
+            updates = json.loads(data)
+        except json.JSONDecodeError as e:
+            rprint(f"[red]Error:[/red] Invalid JSON for --data: {escape(str(e))}")
+            raise typer.Exit(code=1) from None
+        if not isinstance(updates, dict):
+            rprint("[red]Error:[/red] --data must be a JSON object.")
+            raise typer.Exit(code=1)
+
+    # Individual flags override --data values
+    if vendor_name is not None:
+        updates["vendor_name"] = vendor_name
+    if total is not None:
+        updates["total"] = total
+    if expense_date is not None:
+        updates["expense_date"] = expense_date
+    if currency is not None:
+        updates["currency"] = currency
+    if tax_amount is not None:
+        updates["tax_amount"] = tax_amount
+    if tax_rate is not None:
+        updates["tax_rate"] = tax_rate
+    if payment_method is not None:
+        updates["payment_method"] = payment_method
+    if invoice_number is not None:
+        updates["invoice_number"] = invoice_number
+    if tags is not None:
+        updates["tags"] = [t.strip() for t in tags.split(",")]
+
+    if not updates:
+        rprint("[yellow]No updates provided. Use --data or field flags (e.g. --vendor-name).[/yellow]")
+        raise typer.Exit(code=1)
+
+    async def _run() -> Any:
+        from billfox.models.receipt import Receipt
+        from billfox.store.sqlite import SQLiteDocumentStore
+
+        embedder = _helpers.try_build_embedder()
+        store_instance: Any = SQLiteDocumentStore(
+            db_path=db,
+            schema=Receipt,
+            embedder=embedder,
+            embed_fields=RECEIPT_EMBED_FIELDS,
+        )
+        try:
+            existing = await store_instance.get(document_id)
+            if existing is None:
+                return None
+            updated = existing.model_copy(update=updates)
+            await store_instance.save(document_id, updated)
+            return updated
+        finally:
+            await store_instance.close()
+
+    try:
+        result = asyncio.run(_run())
+    except Exception as e:
+        rprint(f"[red]Error:[/red] {escape(str(e))}")
+        raise typer.Exit(code=1) from None
+
+    if result is None:
+        if json_output:
+            sys.stdout.write(json.dumps({"error": "not_found", "document_id": document_id}))
+            sys.stdout.write("\n")
+        else:
+            rprint(f"[yellow]Receipt {document_id!r} not found.[/yellow]")
+        raise typer.Exit(code=1)
+
+    output_text = (
+        result.model_dump_json(indent=2) if json_output
+        else json.dumps(result.model_dump(), indent=2)
+    )
+    sys.stdout.write(output_text)
     sys.stdout.write("\n")

@@ -289,10 +289,17 @@ class SQLiteDocumentStore(Generic[T]):
 
         async with session.begin():
             for field_name in self._embed_fields:
-                value = model_dict.get(field_name)
-                if value is None:
+                method = getattr(data, field_name, None)
+                if callable(method):
+                    text_content = method()
+                else:
+                    value = model_dict.get(field_name)
+                    if value is None:
+                        continue
+                    text_content = str(value)
+
+                if not text_content:
                     continue
-                text_content = str(value)
 
                 # Upsert embedding row
                 existing = (

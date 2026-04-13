@@ -228,3 +228,59 @@ async def test_delete_cascades_embeddings() -> None:
             )
         ).scalar_one()
         assert count_after == 0
+
+
+class ModelWithSearchText(BaseModel):
+    """Test model with a search_text() method for callable embed_fields."""
+    name: str
+    category: str = ""
+
+    def search_text(self) -> str:
+        parts = []
+        if self.name:
+            parts.append(f"Name: {self.name}")
+        if self.category:
+            parts.append(f"Category: {self.category}")
+        return "\n".join(parts)
+
+
+async def test_callable_embed_field() -> None:
+    """_sync_embeddings calls a method when embed_fields names a callable."""
+    from sqlalchemy import select as sa_select
+
+    from billfox.store._schema import DocumentEmbeddingRow
+
+    s: SQLiteDocumentStore[ModelWithSearchText] = SQLiteDocumentStore(
+        db_path=":memory:",
+        schema=ModelWithSearchText,
+        embed_fields=["search_text"],
+    )
+    await s.save("doc-callable", ModelWithSearchText(name="Coffee Shop", category="food"))
+
+    async with s._session_factory() as session:
+        row = (
+            await session.execute(
+                sa_select(DocumentEmbeddingRow).where(
+                    DocumentEmbeddingRow.document_id == "doc-callable",
+                    DocumentEmbeddingRow.field_name == "search_text",
+                )
+            )
+        ).scalar_one()
+        assert "Name: Coffee Shop" in row.text_content
+        assert "Category: food" in row.text_content
+
+
+async def test_callable_embed_field_bm25_search() -> None:
+    """Callable embed_fields content is searchable via BM25."""
+    s: SQLiteDocumentStore[ModelWithSearchText] = SQLiteDocumentStore(
+        db_path=":memory:",
+        schema=ModelWithSearchText,
+        embed_fields=["search_text"],
+    )
+    await s.save("d1", ModelWithSearchText(name="morning coffee shop", category="cafe"))
+    await s.save("d2", ModelWithSearchText(name="evening bookstore", category="books"))
+
+    results = await s.search("coffee", mode="bm25")
+    doc_ids = [r.document_id for r in results]
+    assert "d1" in doc_ids
+    assert "d2" not in doc_ids

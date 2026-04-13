@@ -389,6 +389,51 @@ class TestHybridSearchRanking:
         assert "vector" not in results[0].signals
 
 
+    @pytest.mark.asyncio
+    async def test_real_receipt_search_text_bm25(self) -> None:
+        """Real Receipt model with search_text() is searchable via BM25."""
+        from billfox.models.receipt import Receipt as RealReceipt
+        from billfox.models.receipt import ReceiptItem
+
+        store: SQLiteDocumentStore[RealReceipt] = SQLiteDocumentStore(
+            db_path=":memory:",
+            schema=RealReceipt,
+            embed_fields=["search_text"],
+        )
+
+        await store.save(
+            "r1",
+            RealReceipt(
+                vendor_name="Starbucks",
+                items=[ReceiptItem(description="Latte"), ReceiptItem(description="Muffin")],
+                tags=["coffee"],
+            ),
+        )
+        await store.save(
+            "r2",
+            RealReceipt(
+                vendor_name="Office Depot",
+                items=[ReceiptItem(description="Printer Paper")],
+            ),
+        )
+
+        # Search by vendor name
+        results = await store.search("Starbucks", mode="bm25")
+        doc_ids = [r.document_id for r in results]
+        assert "r1" in doc_ids
+        assert "r2" not in doc_ids
+
+        # Search by item description
+        results = await store.search("Latte", mode="bm25")
+        doc_ids = [r.document_id for r in results]
+        assert "r1" in doc_ids
+
+        # Search by tag
+        results = await store.search("coffee", mode="bm25")
+        doc_ids = [r.document_id for r in results]
+        assert "r1" in doc_ids
+
+
 # ---------------------------------------------------------------------------
 # Import isolation: `import billfox` with only pydantic
 # ---------------------------------------------------------------------------

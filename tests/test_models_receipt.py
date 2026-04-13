@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-from pydantic import ValidationError
-
 from billfox.models.receipt import Receipt, ReceiptItem
 
 
@@ -46,22 +43,15 @@ class TestReceiptItem:
 
 class TestReceipt:
     def test_minimal(self) -> None:
-        receipt = Receipt(is_expense=True)
-        assert receipt.is_expense is True
+        receipt = Receipt()
         assert receipt.items == []
         assert receipt.tags == []
         assert receipt.view_tags == []
         assert receipt.vendor_name is None
         assert receipt.total is None
 
-    def test_is_expense_required(self) -> None:
-        with pytest.raises(ValidationError):
-            Receipt()  # type: ignore[call-arg]
-
     def test_all_fields(self) -> None:
         receipt = Receipt(
-            is_expense=True,
-            invalid_receipt_reason=None,
             expense_number="EXP-001",
             expense_date="2026-01-15",
             vendor_name="Acme Corp",
@@ -95,17 +85,8 @@ class TestReceipt:
         assert receipt.country == "Australia"
         assert receipt.surcharge_amount == 1.50
 
-    def test_not_expense(self) -> None:
-        receipt = Receipt(
-            is_expense=False,
-            invalid_receipt_reason="Not a receipt - this is a menu",
-        )
-        assert receipt.is_expense is False
-        assert receipt.invalid_receipt_reason == "Not a receipt - this is a menu"
-
     def test_serialization_roundtrip(self) -> None:
         receipt = Receipt(
-            is_expense=True,
             vendor_name="Store",
             total=25.00,
             items=[ReceiptItem(description="Item A", total=25.00)],
@@ -117,7 +98,6 @@ class TestReceipt:
 
     def test_json_roundtrip(self) -> None:
         receipt = Receipt(
-            is_expense=True,
             vendor_name="Cafe",
             total=15.50,
             currency="USD",
@@ -128,8 +108,7 @@ class TestReceipt:
         assert restored == receipt
 
     def test_defaults_for_optional_fields(self) -> None:
-        receipt = Receipt(is_expense=True)
-        assert receipt.invalid_receipt_reason is None
+        receipt = Receipt()
         assert receipt.expense_number is None
         assert receipt.expense_date is None
         assert receipt.vendor_name is None
@@ -146,6 +125,53 @@ class TestReceipt:
         assert receipt.payment_method is None
         assert receipt.currency is None
         assert receipt.country is None
+
+
+class TestSearchText:
+    def test_all_fields(self) -> None:
+        receipt = Receipt(
+            vendor_name="Acme Corp",
+            invoice_number="INV-001",
+            items=[
+                ReceiptItem(description="Widget"),
+                ReceiptItem(description="Gadget"),
+            ],
+            tags=["office", "supplies"],
+        )
+        text = receipt.search_text()
+        assert "Vendor: Acme Corp" in text
+        assert "Invoice: INV-001" in text
+        assert "Items: Widget, Gadget" in text
+        assert "Tags: office supplies" in text
+
+    def test_minimal_receipt(self) -> None:
+        receipt = Receipt()
+        assert receipt.search_text() == ""
+
+    def test_vendor_only(self) -> None:
+        receipt = Receipt(vendor_name="Coffee Shop")
+        assert receipt.search_text() == "Vendor: Coffee Shop"
+
+    def test_items_with_none_descriptions(self) -> None:
+        receipt = Receipt(
+            items=[
+                ReceiptItem(description="Coffee"),
+                ReceiptItem(description=None),
+                ReceiptItem(description="Pastry"),
+            ],
+        )
+        text = receipt.search_text()
+        assert "Items: Coffee, Pastry" in text
+
+    def test_empty_items_list(self) -> None:
+        receipt = Receipt(vendor_name="Shop", items=[])
+        assert "Items:" not in receipt.search_text()
+
+    def test_items_all_none_descriptions(self) -> None:
+        receipt = Receipt(
+            items=[ReceiptItem(), ReceiptItem()],
+        )
+        assert "Items:" not in receipt.search_text()
 
 
 class TestImportability:

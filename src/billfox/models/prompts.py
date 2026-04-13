@@ -8,14 +8,10 @@ a receipt or invoice document into a Receipt model. Follow these rules carefully
 
 ## Document Classification
 
-1. Determine whether the document is a valid expense receipt or invoice.
-2. Set `is_expense` to `true` if the document is a genuine receipt, invoice, tax invoice,
-   or proof of purchase for goods or services.
-3. Set `is_expense` to `false` if the document is NOT a valid expense — for example, a
-   bank statement, a marketing flyer, a personal note, or any non-transactional document.
-4. When `is_expense` is `false`, populate `invalid_receipt_reason` with a brief explanation
-   of why the document is not a valid expense (e.g. "Document is a bank statement, not a
-   receipt"). Leave all other fields at their defaults.
+Only extract data from valid expense receipts or invoices (genuine receipts, invoices,
+tax invoices, or proofs of purchase for goods or services). If the document is NOT a valid
+expense (e.g. a bank statement, a marketing flyer, a personal note, or any
+non-transactional document), leave ALL fields at their defaults (null/empty).
 
 ## Currency Handling
 
