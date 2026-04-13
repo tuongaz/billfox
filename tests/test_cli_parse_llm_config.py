@@ -56,7 +56,7 @@ def _run_parse(
 
     with (
         patch("billfox.pipeline.Pipeline", return_value=mock_pipeline),
-        patch("billfox.cli.app._read_config", return_value=config),
+        patch("billfox.cli._helpers.read_config", return_value=config),
         patch("billfox.parse.llm.LLMParser", mock_llm_parser_cls) as mock_cls,
     ):
         result = runner.invoke(app, args)

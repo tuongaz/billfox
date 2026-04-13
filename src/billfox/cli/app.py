@@ -4,7 +4,6 @@ import asyncio
 import importlib.util
 import json
 import sys
-import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +11,8 @@ import typer
 from dotenv import load_dotenv
 from rich import print as rprint
 from rich.markup import escape
+
+import billfox.cli._helpers as _helpers
 
 # Load .env files early, before any command runs.
 # Global (~/.billfox/.env) first, then project-local (./.env).
@@ -24,107 +25,6 @@ app: Any = typer.Typer(
     help="Composable document data extraction: load, preprocess, OCR, LLM parse, store with vector search.",
     no_args_is_help=True,
 )
-
-
-def _ensure_configured() -> None:
-    """Check that billfox has been configured via 'billfox init'.
-
-    Exits with code 1 if config.toml is missing or defaults.ocr.provider is not set.
-    """
-    config = _read_config()
-    if _get_nested(config, "defaults.ocr.provider") is None:
-
-        rprint(
-            "[yellow]billfox is not configured yet. "
-            "Run 'billfox init' to set up.[/yellow]"
-        )
-        raise typer.Exit(code=1)
-
-
-def _make_progress_callback() -> Any:
-    """Create a progress callback for CLI commands, or None if not a TTY."""
-    if not sys.stdout.isatty():
-        return None
-
-    from rich.console import Console
-
-    from billfox._progress import ProgressEvent, Status
-
-    console = Console(stderr=True)
-
-    async def _on_progress(event: ProgressEvent) -> None:
-        stage_name = event.stage.value.lower()
-        if event.status == Status.STARTED:
-            console.print(f"[bold blue]{stage_name}[/bold blue]...", highlight=False)
-        elif event.status == Status.IN_PROGRESS:
-            console.print(f"  [dim]{escape(event.message or '')}[/dim]", highlight=False)
-        elif event.status == Status.COMPLETED:
-            console.print(f"[bold blue]{stage_name}[/bold blue] [green]done[/green]", highlight=False)
-        elif event.status == Status.FAILED:
-            console.print(
-                f"[bold blue]{stage_name}[/bold blue] [red]{escape(event.message or '')}[/red]",
-                highlight=False,
-            )
-
-    return _on_progress
-
-
-def _make_step_callback() -> Any:
-    """Create a synchronous step callback for extractor sub-steps, or None if not a TTY."""
-    if not sys.stdout.isatty():
-        return None
-
-    from rich.console import Console
-
-    console = Console(stderr=True)
-
-    def _on_step(message: str) -> None:
-        console.print(f"  [dim]{escape(message)}[/dim]", highlight=False)
-
-    return _on_step
-
-
-def _build_preprocessors(preprocess: str | None, api_key: str | None = None) -> list[Any]:
-    """Build preprocessor list from comma-separated string."""
-    if not preprocess:
-        return []
-
-    preprocessors: list[Any] = []
-    for name in preprocess.split(","):
-        name = name.strip().lower()
-        if name == "resize":
-            from billfox.preprocess.resize import ResizePreprocessor
-
-            preprocessors.append(ResizePreprocessor())
-        elif name == "yolo":
-            raise typer.BadParameter(
-                "YOLO preprocessor requires a model_path. "
-                "Use the Python API directly for YOLO preprocessing."
-            )
-        else:
-            raise typer.BadParameter(
-                f"Unknown preprocessor: {name!r}. Available: resize, yolo"
-            )
-    return preprocessors
-
-
-def _build_extractor(extractor: str, api_key: str | None) -> Any:
-    """Build an extractor by name."""
-    if extractor == "docling":
-        from billfox.extract.docling import DoclingExtractor
-
-        return DoclingExtractor()
-    elif extractor == "mistral":
-        from billfox.extract.mistral import MistralExtractor
-
-        kwargs: dict[str, str] = {}
-        if api_key:
-            kwargs["api_key"] = api_key
-        return MistralExtractor(**kwargs)
-    else:
-        raise typer.BadParameter(
-            f"Unknown extractor: {extractor!r}. Available: docling, mistral"
-        )
 
 
 def _load_schema(schema_path: str) -> type[Any]:
@@ -171,9 +71,9 @@ def extract(
 
     _ctx = _click.get_current_context()
     if _ctx.get_parameter_source("extractor") != _click.core.ParameterSource.COMMANDLINE:
-        _ensure_configured()
-        config = _read_config()
-        configured_provider = _get_nested(config, "defaults.ocr.provider")
+        _helpers.ensure_configured()
+        config = _helpers.read_config()
+        configured_provider = _helpers.get_nested(config, "defaults.ocr.provider")
         if configured_provider:
             extractor = configured_provider
 
@@ -182,8 +82,8 @@ def extract(
 
         logging.basicConfig(level=logging.DEBUG)
 
-    on_progress = _make_progress_callback()
-    on_step = _make_step_callback()
+    on_progress = _helpers.make_progress_callback()
+    on_step = _helpers.make_step_callback()
 
     async def _run() -> str:
         from billfox._progress import ProgressEvent, Stage, Status
@@ -194,8 +94,8 @@ def extract(
                 await on_progress(ProgressEvent(stage=stage, status=status, **kwargs))
 
         source = LocalFileSource()
-        ext = _build_extractor(extractor, api_key)
-        preprocessors = _build_preprocessors(preprocess)
+        ext = _helpers.build_extractor(extractor, api_key)
+        preprocessors = _helpers.build_preprocessors(preprocess)
 
         try:
             await _emit(Stage.LOADING, Status.STARTED)
@@ -273,11 +173,11 @@ def parse(
         or _ctx.get_parameter_source("extractor") == _click.core.ParameterSource.COMMANDLINE
     )
     if not _has_override:
-        _ensure_configured()
+        _helpers.ensure_configured()
 
     # Use configured OCR provider when --extractor not passed
     if _ctx.get_parameter_source("extractor") != _click.core.ParameterSource.COMMANDLINE:
-        config_ocr = _get_nested(_read_config(), "defaults.ocr.provider")
+        config_ocr = _helpers.get_nested(_helpers.read_config(), "defaults.ocr.provider")
         if config_ocr:
             extractor = config_ocr
 
@@ -287,32 +187,12 @@ def parse(
         logging.basicConfig(level=logging.DEBUG)
 
     # Resolve model and base_url from config when --model is not passed
-    config = _read_config()
-    base_url: str | None = None
-    resolved_model = model
-
-    if resolved_model is None:
-        llm_provider = _get_nested(config, "defaults.llm.provider")
-        if llm_provider == "ollama":
-            ollama_model = _get_nested(config, "defaults.ollama.model")
-            if ollama_model:
-                resolved_model = f"ollama:{ollama_model}"
-            base_url = _get_nested(config, "defaults.ollama.base_url")
-        else:
-            config_model = _get_nested(config, "defaults.llm.model")
-            if config_model:
-                resolved_model = config_model
-
-    if resolved_model is None:
-        resolved_model = "openai:gpt-4.1"
-
-    # For any ollama: model (including CLI override), pick up base_url from config
-    if resolved_model.startswith("ollama:") and base_url is None:
-        base_url = _get_nested(config, "defaults.ollama.base_url")
+    config = _helpers.read_config()
+    resolved_model, base_url = _helpers.resolve_llm_model(model, config)
 
     schema_cls = _load_schema(schema)
-    on_progress = _make_progress_callback()
-    on_step = _make_step_callback()
+    on_progress = _helpers.make_progress_callback()
+    on_step = _helpers.make_step_callback()
 
     async def _run() -> Any:
         from billfox.parse.llm import LLMParser
@@ -320,8 +200,8 @@ def parse(
         from billfox.source.local import LocalFileSource
 
         source = LocalFileSource()
-        ext = _build_extractor(extractor, api_key)
-        preprocessors = _build_preprocessors(preprocess)
+        ext = _helpers.build_extractor(extractor, api_key)
+        preprocessors = _helpers.build_preprocessors(preprocess)
         parser: Any = LLMParser(
             model=resolved_model,
             output_type=schema_cls,
@@ -340,9 +220,9 @@ def parse(
             )
 
             # Also set up backup from config when storing
-            config = _read_config()
-            backup_provider = _get_nested(config, "defaults.backup.provider")
-            backup_local_path = _get_nested(config, "defaults.backup.local_path")
+            config = _helpers.read_config()
+            backup_provider = _helpers.get_nested(config, "defaults.backup.provider")
+            backup_local_path = _helpers.get_nested(config, "defaults.backup.local_path")
             backup_instance = build_backup_from_config(
                 backup_provider, backup_local_path,
             )
@@ -383,77 +263,6 @@ def parse(
         sys.stdout.write("\n")
 
 
-# ── Config helpers ──────────────────────────────────────────────
-
-
-def _get_config_dir() -> Path:
-    """Return the billfox config directory (~/.billfox)."""
-    return Path.home() / ".billfox"
-
-
-def _get_config_file() -> Path:
-    """Return the billfox config file path."""
-    return _get_config_dir() / "config.toml"
-
-
-def _read_config() -> dict[str, Any]:
-    """Read config from ~/.billfox/config.toml."""
-    config_file = _get_config_file()
-    if not config_file.exists():
-        return {}
-    with open(config_file, "rb") as f:
-        return tomllib.load(f)
-
-
-
-
-def _write_config(config: dict[str, Any]) -> None:
-    """Write config to ~/.billfox/config.toml."""
-    import tomli_w
-
-    config_dir = _get_config_dir()
-    config_dir.mkdir(parents=True, exist_ok=True)
-    config_file = config_dir / "config.toml"
-    with open(config_file, "wb") as f:
-        tomli_w.dump(config, f)
-
-
-def _get_nested(config: dict[str, Any], key: str) -> Any:
-    """Get a nested value from config using dot-separated key."""
-    parts = key.split(".")
-    current: Any = config
-    for part in parts:
-        if not isinstance(current, dict) or part not in current:
-            return None
-        current = current[part]
-    return current
-
-
-def _set_nested(config: dict[str, Any], key: str, value: str) -> None:
-    """Set a nested value in config using dot-separated key."""
-    parts = key.split(".")
-    current: Any = config
-    for part in parts[:-1]:
-        if part not in current or not isinstance(current[part], dict):
-            current[part] = {}
-        current = current[part]
-    current[parts[-1]] = value
-
-
-def _flatten_config(
-    config: dict[str, Any], prefix: str = "",
-) -> list[tuple[str, str]]:
-    """Flatten a nested config dict into (dotted_key, value) pairs."""
-    items: list[tuple[str, str]] = []
-    for key, value in config.items():
-        full_key = f"{prefix}.{key}" if prefix else key
-        if isinstance(value, dict):
-            items.extend(_flatten_config(value, full_key))
-        else:
-            items.append((full_key, str(value)))
-    return items
-
-
 # ── Config sub-app ──────────────────────────────────────────────
 
 config_app: Any = typer.Typer(
@@ -489,9 +298,9 @@ def config_set(
     value: str = typer.Argument(..., help="Config value."),
 ) -> None:
     """Set a configuration value."""
-    config = _read_config()
-    _set_nested(config, key, value)
-    _write_config(config)
+    config = _helpers.read_config()
+    _helpers.set_nested(config, key, value)
+    _helpers.write_config(config)
     rprint(f"[green]Set {key} = {value}[/green]")
 
 
@@ -500,8 +309,8 @@ def config_get(
     key: str = typer.Argument(..., help="Config key (e.g. api_keys.mistral)."),
 ) -> None:
     """Get a configuration value."""
-    config = _read_config()
-    val = _get_nested(config, key)
+    config = _helpers.read_config()
+    val = _helpers.get_nested(config, key)
     if val is None:
 
         rprint(f"[yellow]Key {key!r} not set[/yellow]")
@@ -512,36 +321,13 @@ def config_get(
 @config_app.command("list")  # type: ignore[untyped-decorator]
 def config_list() -> None:
     """List all configuration values."""
-    config = _read_config()
+    config = _helpers.read_config()
     if not config:
 
         rprint("[yellow]No configuration set.[/yellow]")
         return
-    for k, v in _flatten_config(config):
+    for k, v in _helpers.flatten_config(config):
         rprint(f"[bold]{k}[/bold] = {v}")
-
-
-# ── Search helpers ──────────────────────────────────────────────
-
-
-def _try_build_embedder() -> Any:
-    """Try to build an OpenAI embedder from env or config."""
-    import os
-
-    api_key = os.environ.get("OPENAI_API_KEY")
-    if not api_key:
-        config = _read_config()
-        api_key_val = _get_nested(config, "api_keys.openai")
-        if isinstance(api_key_val, str):
-            api_key = api_key_val
-    if api_key:
-        try:
-            from billfox.embed.openai import OpenAIEmbedder
-
-            return OpenAIEmbedder(api_key=api_key)
-        except ImportError:
-            return None
-    return None
 
 
 def _display_search_results(results: list[Any]) -> None:
@@ -613,7 +399,7 @@ def search(
         class _AnyModel(_BaseModel):
             model_config = ConfigDict(extra="allow")
 
-        embedder = _try_build_embedder()
+        embedder = _helpers.try_build_embedder()
 
         store_instance: Any = SQLiteDocumentStore(
             db_path=db,

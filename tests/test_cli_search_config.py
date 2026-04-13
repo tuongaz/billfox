@@ -35,7 +35,7 @@ class TestSearchCommand:
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
-            patch("billfox.cli.app._try_build_embedder", return_value=None),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
                 app, ["search", "acme", "--db", "/tmp/test.db", "--json"]
@@ -61,7 +61,7 @@ class TestSearchCommand:
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
-            patch("billfox.cli.app._try_build_embedder", return_value=None),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
                 app, ["search", "test", "--db", "/tmp/test.db"]
@@ -76,7 +76,7 @@ class TestSearchCommand:
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
-            patch("billfox.cli.app._try_build_embedder", return_value=None),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
                 app, ["search", "nothing", "--db", "/tmp/test.db"]
@@ -90,7 +90,7 @@ class TestSearchCommand:
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
-            patch("billfox.cli.app._try_build_embedder", return_value=None),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
                 app,
@@ -106,7 +106,7 @@ class TestSearchCommand:
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
-            patch("billfox.cli.app._try_build_embedder", return_value=None),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
                 app,
@@ -127,7 +127,7 @@ class TestSearchCommand:
 
         with (
             patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
-            patch("billfox.cli.app._try_build_embedder", return_value=None),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
         ):
             result = runner.invoke(
                 app, ["search", "q", "--db", "/tmp/t.db", "--json"]
@@ -154,7 +154,7 @@ class TestConfigCommand:
     """Tests for the config subcommands."""
 
     def test_config_set(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             result = runner.invoke(
                 app, ["config", "set", "api_keys.mistral", "sk-test"]
             )
@@ -165,7 +165,7 @@ class TestConfigCommand:
         assert config_file.exists()
 
     def test_config_get(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             runner.invoke(
                 app, ["config", "set", "api_keys.mistral", "sk-test"]
             )
@@ -177,7 +177,7 @@ class TestConfigCommand:
         assert "sk-test" in result.output
 
     def test_config_get_missing_key(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             result = runner.invoke(
                 app, ["config", "get", "nonexistent.key"]
             )
@@ -185,7 +185,7 @@ class TestConfigCommand:
         assert result.exit_code == 1
 
     def test_config_list(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             runner.invoke(
                 app, ["config", "set", "api_keys.mistral", "sk-m"]
             )
@@ -199,14 +199,14 @@ class TestConfigCommand:
         assert "api_keys.openai" in result.output
 
     def test_config_list_empty(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             result = runner.invoke(app, ["config", "list"])
 
         assert result.exit_code == 0
         assert "No configuration" in result.output
 
     def test_config_set_nested_creates_parents(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             runner.invoke(
                 app, ["config", "set", "defaults.extractor", "mistral"]
             )
@@ -218,7 +218,7 @@ class TestConfigCommand:
         assert "mistral" in result.output
 
     def test_config_set_overwrite(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             runner.invoke(
                 app, ["config", "set", "api_keys.openai", "old-key"]
             )
@@ -233,7 +233,7 @@ class TestConfigCommand:
         assert "new-key" in result.output
 
     def test_config_supports_all_keys(self, tmp_path: Path) -> None:
-        with patch("billfox.cli.app._get_config_dir", return_value=tmp_path):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=tmp_path):
             runner.invoke(
                 app, ["config", "set", "api_keys.mistral", "m-key"]
             )
@@ -256,7 +256,7 @@ class TestConfigCommand:
 
     def test_config_dir_auto_created(self, tmp_path: Path) -> None:
         config_dir = tmp_path / "subdir" / ".billfox"
-        with patch("billfox.cli.app._get_config_dir", return_value=config_dir):
+        with patch("billfox.cli._helpers.get_config_dir", return_value=config_dir):
             result = runner.invoke(
                 app, ["config", "set", "api_keys.mistral", "sk-x"]
             )
