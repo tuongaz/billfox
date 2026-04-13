@@ -47,15 +47,15 @@ def init(
     yes: bool = typer.Option(False, "--yes", "-y", help="Skip confirmation when overwriting existing config."),
 ) -> None:
     """Interactive setup wizard for billfox."""
-    from billfox.cli.app import _get_config_dir, _read_config, _write_config
+    from billfox.cli._helpers import get_config_dir, read_config, write_config
 
     console = Console(stderr=True)
 
-    config_dir = _get_config_dir()
+    config_dir = get_config_dir()
     config_file = config_dir / "config.toml"
 
     # Check for existing config
-    existing_config = _read_config()
+    existing_config = read_config()
     if existing_config and not yes:
         console.print("\n[yellow]Existing configuration found.[/yellow]")
         overwrite = typer.confirm("Overwrite existing config?", default=False)
@@ -166,7 +166,7 @@ def init(
         config["defaults"]["backup"]["local_path"] = backup_local_path
 
     # ── Write config ─────────────────────────────────────────────
-    _write_config(config)
+    write_config(config)
     console.print(f"\n[green]Configuration saved to {config_file}[/green]")
 
     # ── Show env var guidance ────────────────────────────────────
