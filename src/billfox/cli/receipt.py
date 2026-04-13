@@ -374,16 +374,23 @@ def _display_list_results(
     table.add_column("#", style="dim")
     table.add_column("Document ID", style="bold")
     table.add_column("Vendor")
+    table.add_column("Items")
     table.add_column("Total", justify="right")
     table.add_column("Date")
     table.add_column("Currency")
 
     for idx, (doc_id, data) in enumerate(items, 1):
         d = data.model_dump()
+        item_names = ", ".join(
+            item["description"]
+            for item in (d.get("items") or [])
+            if item.get("description")
+        )
         table.add_row(
             str(idx),
             doc_id,
             str(d.get("vendor_name") or ""),
+            item_names,
             str(d.get("total") or ""),
             str(d.get("expense_date") or ""),
             str(d.get("currency") or ""),
