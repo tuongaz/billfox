@@ -378,6 +378,7 @@ def _display_list_results(
     table.add_column("Total", justify="right")
     table.add_column("Date")
     table.add_column("Currency")
+    table.add_column("Type")
 
     for idx, (doc_id, data) in enumerate(items, 1):
         d = data.model_dump()
@@ -394,6 +395,7 @@ def _display_list_results(
             str(d.get("total") or ""),
             str(d.get("expense_date") or ""),
             str(d.get("currency") or ""),
+            str(d.get("expense_type") or "personal"),
         )
 
     console.print(table)
@@ -510,6 +512,7 @@ def edit_receipt(
     payment_method: str | None = typer.Option(None, "--payment-method", help="Payment method."),
     invoice_number: str | None = typer.Option(None, "--invoice-number", help="Invoice number."),
     tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags."),
+    expense_type: str | None = typer.Option(None, "--expense-type", help="Expense type (business or personal)."),
     db: str = typer.Option(
         str(Path.home() / ".billfox" / "receipts.db"),
         "--db", "-d",
@@ -555,6 +558,11 @@ def edit_receipt(
         updates["invoice_number"] = invoice_number
     if tags is not None:
         updates["tags"] = [t.strip() for t in tags.split(",")]
+    if expense_type is not None:
+        if expense_type not in ("business", "personal"):
+            rprint("[red]Error:[/red] --expense-type must be 'business' or 'personal'.")
+            raise typer.Exit(code=1)
+        updates["expense_type"] = expense_type
 
     if not updates:
         rprint("[yellow]No updates provided. Use --data or field flags (e.g. --vendor-name).[/yellow]")

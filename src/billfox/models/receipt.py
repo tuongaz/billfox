@@ -37,6 +37,7 @@ class Receipt(BaseModel):
     items: list[ReceiptItem] = []
     tags: list[str] = []
     view_tags: list[str] = []
+    expense_type: str = "personal"
 
     def search_text(self) -> str:
         """Build composite text for search indexing (BM25 + vector)."""
@@ -53,4 +54,6 @@ class Receipt(BaseModel):
                 parts.append(f"Items: {descs}")
         if self.tags:
             parts.append(f"Tags: {' '.join(self.tags)}")
+        if self.expense_type:
+            parts.append(f"Expense type: {self.expense_type}")
         return "\n".join(parts)

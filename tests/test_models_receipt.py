@@ -47,6 +47,7 @@ class TestReceipt:
         assert receipt.items == []
         assert receipt.tags == []
         assert receipt.view_tags == []
+        assert receipt.expense_type == "personal"
         assert receipt.vendor_name is None
         assert receipt.total is None
 
@@ -74,6 +75,7 @@ class TestReceipt:
             ],
             tags=["office", "supplies"],
             view_tags=["Q1-2026"],
+            expense_type="business",
         )
         assert receipt.vendor_name == "Acme Corp"
         assert receipt.total == 110.00
@@ -84,6 +86,7 @@ class TestReceipt:
         assert receipt.currency == "AUD"
         assert receipt.country == "Australia"
         assert receipt.surcharge_amount == 1.50
+        assert receipt.expense_type == "business"
 
     def test_serialization_roundtrip(self) -> None:
         receipt = Receipt(
@@ -144,13 +147,20 @@ class TestSearchText:
         assert "Items: Widget, Gadget" in text
         assert "Tags: office supplies" in text
 
+    def test_expense_type_in_search_text(self) -> None:
+        receipt = Receipt(vendor_name="Acme", expense_type="business")
+        text = receipt.search_text()
+        assert "Expense type: business" in text
+
     def test_minimal_receipt(self) -> None:
         receipt = Receipt()
-        assert receipt.search_text() == ""
+        assert receipt.search_text() == "Expense type: personal"
 
     def test_vendor_only(self) -> None:
         receipt = Receipt(vendor_name="Coffee Shop")
-        assert receipt.search_text() == "Vendor: Coffee Shop"
+        text = receipt.search_text()
+        assert "Vendor: Coffee Shop" in text
+        assert "Expense type: personal" in text
 
     def test_items_with_none_descriptions(self) -> None:
         receipt = Receipt(
@@ -172,6 +182,13 @@ class TestSearchText:
             items=[ReceiptItem(), ReceiptItem()],
         )
         assert "Items:" not in receipt.search_text()
+
+
+    def test_backward_compat_missing_expense_type(self) -> None:
+        """Old receipts stored without expense_type get the default."""
+        old_json = '{"vendor_name": "Old Store", "total": 10.0}'
+        receipt = Receipt.model_validate_json(old_json)
+        assert receipt.expense_type == "personal"
 
 
 class TestImportability:

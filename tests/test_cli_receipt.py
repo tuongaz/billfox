@@ -675,6 +675,38 @@ class TestReceiptEditCommand:
         assert "--tags" in result.output
         assert "--db" in result.output
         assert "--json" in result.output
+        assert "--expense-type" in result.output
+
+    def test_edit_expense_type(self) -> None:
+        existing = self._make_existing_receipt()
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--expense-type", "business",
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["expense_type"] == "business"
+
+    def test_edit_expense_type_invalid(self) -> None:
+        result = runner.invoke(
+            app, [
+                "receipt", "edit", "doc1",
+                "--expense-type", "invalid",
+                "--db", "/tmp/test.db",
+            ]
+        )
+        assert result.exit_code == 1
+        assert "business" in result.output.lower() or "personal" in result.output.lower()
 
 
 class TestReceiptHelp:

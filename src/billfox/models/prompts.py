@@ -125,6 +125,17 @@ non-transactional document), leave ALL fields at their defaults (null/empty).
    "business-expense", "personal", "reimbursable", "recurring".
 3. Generate 0-2 view tags based on the nature of the expense.
 
+## Expense Type Classification
+
+1. Classify the expense as "business" or "personal" in `expense_type`.
+2. Default to "personal" if unclear.
+3. Business indicators: office supplies, software subscriptions, professional services,
+   B2B vendors, equipment, conferences, co-working spaces, domain registrations,
+   shipping, printing.
+4. Personal indicators: groceries, restaurants (unless clearly a client meal), personal
+   care, entertainment, clothing, personal subscriptions (streaming, gym), pharmacy.
+5. When in doubt, use "personal" — the user can override later.
+
 ## Country Detection
 
 1. Detect the country of the transaction and set `country` as a 2-letter ISO 3166-1
