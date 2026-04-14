@@ -5,19 +5,24 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![CI](https://github.com/billfox-ai/billfox/actions/workflows/ci.yml/badge.svg)](https://github.com/billfox-ai/billfox/actions)
 
-**Composable document data extraction** -- load, preprocess, OCR, LLM parse, store with vector search.
+**AI-agent-friendly receipt management** -- extract, parse, store, and search receipts and invoices with composable pipelines built for LLM workflows.
 
-billfox is a Python library for building document processing pipelines from independent, swappable stages. Each stage implements a simple protocol, so you can mix built-in modules with your own.
+billfox is a Python library for building document processing pipelines from independent, swappable stages. Load a document, preprocess it, OCR the text, parse it with any LLM into structured data, and store it with hybrid vector search -- each stage implements a simple protocol, so you can mix built-in modules with your own.
 
 ## How It Works
 
-```
- ┌─────────┐   ┌──────────────┐   ┌───────────┐   ┌────────┐   ┌───────┐
- │  Source  │ → │ Preprocessor │ → │ Extractor │ → │ Parser │ → │ Store │
- │         │   │   (optional)  │   │   (OCR)   │   │ (LLM)  │   │       │
- └─────────┘   └──────────────┘   └───────────┘   └────────┘   └───────┘
-  LocalFile     Resize, YOLO,      Mistral OCR     LLMParser    SQLite +
-                Chain              Docling         (any LLM)    hybrid search
+```mermaid
+graph LR
+    A["Source<br/><small>LocalFileSource</small>"] --> B["Preprocessor<br/><small>Resize, YOLO, Chain</small>"]
+    B --> C["Extractor<br/><small>Mistral OCR, Docling</small>"]
+    C --> D["Parser<br/><small>LLMParser (any LLM)</small>"]
+    D --> E["Store<br/><small>SQLite + hybrid search</small>"]
+
+    style A fill:#4a90d9,stroke:#357abd,color:#fff
+    style B fill:#6c757d,stroke:#565e64,color:#fff
+    style C fill:#e67e22,stroke:#cf6d17,color:#fff
+    style D fill:#27ae60,stroke:#1e8449,color:#fff
+    style E fill:#8e44ad,stroke:#763895,color:#fff
 ```
 
 Every boundary is a **protocol** -- implement `DocumentSource`, `Preprocessor`, `Extractor`, `Parser[T]`, `Embedder`, or `DocumentStore[T]` to plug in your own components.
