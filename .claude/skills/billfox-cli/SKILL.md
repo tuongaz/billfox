@@ -149,6 +149,8 @@ billfox receipt edit ID --data '{"tags": ["food"]}'
 
 Editable flags: `--vendor-name`, `--total`, `--expense-date`, `--currency`, `--tax-amount`, `--tax-rate`, `--payment-method`, `--invoice-number`, `--tags`, `--expense-type`, `--data` (arbitrary JSON).
 
+See Receipt Model section below for all fields.
+
 ### `billfox receipt get <document_id>`
 
 Get file path. `--original` for pre-crop path.
@@ -191,3 +193,9 @@ Interactive setup wizard for OCR, LLM, and backup providers. Config: `~/.billfox
 ### `billfox llms.txt`
 
 Print LLM-consumable documentation.
+
+## Receipt Model
+
+**Receipt fields:** `vendor_name`, `vendor_business_number`, `vendor_email`, `vendor_phone`, `vendor_address`, `vendor_website`, `total` (float), `tax_amount` (float), `tax_rate` (float, decimal e.g. 0.10=10%), `surcharge_amount` (float), `currency` (ISO 3-letter), `payment_method`, `expense_number`, `expense_date` (ISO 8601), `invoice_number`, `country` (ISO 2-letter), `items` (list), `tags` (list), `view_tags` (list), `expense_type` ("business"/"personal").
+
+**ReceiptItem fields:** `description`, `description_translated`, `total` (float), `tax_amount` (float), `tags` (list).
