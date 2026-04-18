@@ -62,10 +62,29 @@ billfox receipt search <query> [options]
 | Flag | Description |
 |---|---|
 | `--db` | Database path |
-| `--limit` | Max results (default: 10) |
+| `--limit` | Max results (default: 20) |
 | `--mode` | Search mode: `hybrid` (default), `vector`, `bm25` |
 | `--fields, -f` | Comma-separated fields to return. Supports dot notation for item subfields (e.g. `items.description`). Use `items` for full item objects. Monetary fields auto-include currency. |
+| `--where, -w` | Filter by numeric condition. Repeatable (AND logic). Operators: `=`, `>`, `<`, `>=`, `<=`. Fields: `total`, `tax_amount`, `surcharge_amount`, `tax_rate`. |
 | `--json` | Output as JSON |
+
+#### Amount filtering with `--where`
+
+```bash
+# Receipts over $50
+billfox receipt search "coffee" --where "total>50"
+
+# Receipts between $20 and $100
+billfox receipt search "lunch" --where "total>=20" --where "total<=100"
+
+# Exact amount
+billfox receipt search "uber" --where "total=25.50"
+
+# Combine with tax
+billfox receipt search "supplies" --where "total>100" --where "tax_amount<=10"
+```
+
+Multiple `--where` flags combine with AND. Receipts with `None` values for the filtered field are excluded.
 
 Search modes:
 - `hybrid` — BM25 + vector with Reciprocal Rank Fusion

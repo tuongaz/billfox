@@ -186,6 +186,129 @@ class TestSearchCommand:
         assert "--mode" in result.output
         assert "--json" in result.output
 
+    def test_search_where_filters_by_total(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"total": 100.0, "vendor_name": "A"}, score=0.9),
+                SearchResult(document_id="d2", data={"total": 30.0, "vendor_name": "B"}, score=0.8),
+                SearchResult(document_id="d3", data={"total": 75.0, "vendor_name": "C"}, score=0.7),
+            ]
+        )
+
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json", "--where", "total>50"],
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 2
+        ids = [r["document_id"] for r in parsed]
+        assert "d1" in ids
+        assert "d3" in ids
+        assert "d2" not in ids
+
+    def test_search_where_equals(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"total": 42.50}, score=0.9),
+                SearchResult(document_id="d2", data={"total": 30.0}, score=0.8),
+            ]
+        )
+
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json", "--where", "total=42.50"],
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 1
+        assert parsed[0]["document_id"] == "d1"
+
+    def test_search_where_multiple_conditions(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"total": 100.0, "tax_amount": 5.0}, score=0.9),
+                SearchResult(document_id="d2", data={"total": 80.0, "tax_amount": 15.0}, score=0.8),
+                SearchResult(document_id="d3", data={"total": 30.0, "tax_amount": 3.0}, score=0.7),
+            ]
+        )
+
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json",
+                 "--where", "total>50", "--where", "tax_amount<=10"],
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 1
+        assert parsed[0]["document_id"] == "d1"
+
+    def test_search_where_skips_none_values(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"total": None}, score=0.9),
+                SearchResult(document_id="d2", data={"total": 50.0}, score=0.8),
+            ]
+        )
+
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json", "--where", "total>0"],
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 1
+        assert parsed[0]["document_id"] == "d2"
+
+    def test_search_where_invalid_field(self) -> None:
+        result = runner.invoke(
+            app,
+            ["receipt", "search", "q", "--db", "/tmp/t.db", "--where", "vendor_name>50"],
+        )
+        assert result.exit_code != 0
+
+    def test_search_where_invalid_syntax(self) -> None:
+        result = runner.invoke(
+            app,
+            ["receipt", "search", "q", "--db", "/tmp/t.db", "--where", "badcondition"],
+        )
+        assert result.exit_code != 0
+
+    def test_search_where_invalid_value(self) -> None:
+        result = runner.invoke(
+            app,
+            ["receipt", "search", "q", "--db", "/tmp/t.db", "--where", "total>abc"],
+        )
+        assert result.exit_code != 0
+
 
 # ── config commands ─────────────────────────────────────────────
 

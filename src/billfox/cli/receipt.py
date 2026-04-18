@@ -118,6 +118,72 @@ def _filter_dict(
     return result
 
 
+import operator
+import re
+
+_WHERE_PATTERN = re.compile(
+    r"^(\w+)\s*(>=|<=|>|<|=)\s*(.+)$"
+)
+_NUMERIC_FIELDS = {"total", "tax_amount", "surcharge_amount", "tax_rate"}
+_OPS: dict[str, Any] = {
+    "=": operator.eq,
+    ">": operator.gt,
+    "<": operator.lt,
+    ">=": operator.ge,
+    "<=": operator.le,
+}
+
+
+def _parse_where(conditions: list[str]) -> list[tuple[str, Any, float]]:
+    """Parse ``--where`` conditions like ``total>50``.
+
+    Returns list of ``(field, op_func, value)`` tuples.
+    """
+    parsed: list[tuple[str, Any, float]] = []
+    for cond in conditions:
+        m = _WHERE_PATTERN.match(cond.strip())
+        if not m:
+            raise typer.BadParameter(
+                f"Invalid condition: {cond!r}. "
+                f"Use FIELD OPERATOR VALUE (e.g. total>50, tax_amount<=10)."
+            )
+        field, op_str, val_str = m.group(1), m.group(2), m.group(3)
+        if field not in _NUMERIC_FIELDS:
+            raise typer.BadParameter(
+                f"Cannot filter on {field!r}. "
+                f"Supported: {', '.join(sorted(_NUMERIC_FIELDS))}."
+            )
+        try:
+            value = float(val_str)
+        except ValueError:
+            raise typer.BadParameter(
+                f"Invalid number in condition: {val_str!r}."
+            ) from None
+        parsed.append((field, _OPS[op_str], value))
+    return parsed
+
+
+def _apply_where(
+    results: list[Any],
+    conditions: list[tuple[str, Any, float]],
+) -> list[Any]:
+    """Filter results by ``--where`` conditions (AND logic)."""
+    if not conditions:
+        return results
+    filtered: list[Any] = []
+    for r in results:
+        data = r.data if isinstance(r.data, dict) else r.data
+        match = True
+        for field, op_func, value in conditions:
+            field_val = data.get(field)
+            if field_val is None or not op_func(float(field_val), value):
+                match = False
+                break
+        if match:
+            filtered.append(r)
+    return filtered
+
+
 receipt_app: Any = typer.Typer(
     name="receipt",
     help="Parse, search, list, delete and edit receipts.",
@@ -350,6 +416,15 @@ def search(
             " Monetary fields auto-include currency."
         ),
     ),
+    where: list[str] | None = typer.Option(
+        None, "--where", "-w",
+        help=(
+            "Filter by numeric condition. Repeatable."
+            " Operators: =, >, <, >=, <=."
+            " Fields: total, tax_amount, surcharge_amount, tax_rate."
+            " Example: --where 'total>50' --where 'tax_amount<=10'"
+        ),
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
@@ -365,6 +440,7 @@ def search(
         )
 
     parsed_fields = _parse_fields(fields)
+    where_conditions = _parse_where(where) if where else []
 
     async def _run() -> list[Any]:
         from billfox.models.receipt import Receipt
@@ -389,6 +465,8 @@ def search(
 
         rprint(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(code=1) from None
+
+    results = _apply_where(results, where_conditions)
 
     if json_output:
         output_text = json.dumps(
