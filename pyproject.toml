@@ -31,6 +31,16 @@ dependencies = [
     "onnxruntime>=1.16",
     "numpy>=1.24",
     "Pillow>=10.0",
+    "sqlalchemy[asyncio]>=2.0",
+    "aiosqlite>=0.19",
+    "sqlite-vec>=0.1",
+    "pydantic-ai>=0.1",
+    "mistralai>=1.0",
+    "openai>=1.0",
+    "anthropic>=0.40",
+    "google-api-python-client>=2.80",
+    "google-auth-httplib2>=0.2",
+    "google-auth-oauthlib>=1.0",
 ]
 
 [project.urls]
@@ -39,22 +49,7 @@ Repository = "https://github.com/billfox-ai/billfox"
 Issues = "https://github.com/billfox-ai/billfox/issues"
 
 [project.optional-dependencies]
-mistral = ["mistralai>=1.0"]
-llm = ["pydantic-ai>=0.1"]
-openai = ["openai>=1.0"]
-anthropic = ["anthropic>=0.40"]
-store = ["sqlalchemy[asyncio]>=2.0", "aiosqlite>=0.19", "sqlite-vec>=0.1"]
-google-drive = ["google-api-python-client>=2.80", "google-auth-httplib2>=0.2", "google-auth-oauthlib>=1.0"]
-all = [
-    "billfox[mistral]",
-    "billfox[llm]",
-    "billfox[openai]",
-    "billfox[anthropic]",
-    "billfox[store]",
-    "billfox[google-drive]",
-]
 dev = [
-    "billfox[all]",
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
     "mypy>=1.5",
