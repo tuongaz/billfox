@@ -68,7 +68,17 @@ billfox receipt search <query> [options]
 | `--where, -w` | Filter by numeric condition. Repeatable (AND logic). Operators: `=`, `>`, `<`, `>=`, `<=`. Fields: `total`, `tax_amount`, `surcharge_amount`, `tax_rate`. |
 | `--json` | Output as JSON |
 
-#### Amount filtering with `--where`
+#### Searching by condition with `--where`
+
+Use `--where` (or `-w`) to filter search results by numeric conditions. This lets you narrow results beyond just the text query — e.g. find receipts matching "coffee" that also cost over $50.
+
+**Syntax:** `--where "FIELD OPERATOR VALUE"`
+
+| Supported fields | Operators |
+|---|---|
+| `total`, `tax_amount`, `surcharge_amount`, `tax_rate` | `=`, `>`, `<`, `>=`, `<=` |
+
+**Examples:**
 
 ```bash
 # Receipts over $50
@@ -80,11 +90,18 @@ billfox receipt search "lunch" --where "total>=20" --where "total<=100"
 # Exact amount
 billfox receipt search "uber" --where "total=25.50"
 
-# Combine with tax
+# Combine amount + tax conditions
 billfox receipt search "supplies" --where "total>100" --where "tax_amount<=10"
+
+# High tax rate receipts
+billfox receipt search "restaurant" --where "tax_rate>=10"
 ```
 
-Multiple `--where` flags combine with AND. Receipts with `None` values for the filtered field are excluded.
+**Behavior:**
+- Multiple `--where` flags combine with AND logic (all conditions must be true)
+- Receipts with `None`/missing values for a filtered field are automatically excluded
+- Conditions are applied post-search — the text query runs first, then results are filtered
+- Invalid field names or malformed conditions raise an error
 
 Search modes:
 - `hybrid` — BM25 + vector with Reciprocal Rank Fusion
