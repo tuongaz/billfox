@@ -667,7 +667,7 @@ def _display_list_results(
                 str(d.get("total") or ""),
                 str(d.get("expense_date") or ""),
                 str(d.get("currency") or ""),
-                str(d.get("expense_type") or "personal"),
+                str(d.get("expense_type") or "business"),
             )
     else:
         # Dynamic columns from --fields

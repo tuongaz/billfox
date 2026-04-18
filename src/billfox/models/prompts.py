@@ -128,7 +128,7 @@ non-transactional document), leave ALL fields at their defaults (null/empty).
 ## Expense Type Classification
 
 1. Classify the expense as "business" or "personal" in `expense_type`.
-2. Default to "personal" if unclear.
+2. Default to "business" if unclear.
 3. Business indicators: office supplies, software subscriptions, professional services,
    B2B vendors, equipment, conferences, co-working spaces, domain registrations,
    shipping, printing.

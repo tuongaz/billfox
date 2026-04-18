@@ -47,7 +47,7 @@ class TestReceipt:
         assert receipt.items == []
         assert receipt.tags == []
         assert receipt.view_tags == []
-        assert receipt.expense_type == "personal"
+        assert receipt.expense_type == "business"
         assert receipt.vendor_name is None
         assert receipt.total is None
 
@@ -154,13 +154,13 @@ class TestSearchText:
 
     def test_minimal_receipt(self) -> None:
         receipt = Receipt()
-        assert receipt.search_text() == "Expense type: personal"
+        assert receipt.search_text() == "Expense type: business"
 
     def test_vendor_only(self) -> None:
         receipt = Receipt(vendor_name="Coffee Shop")
         text = receipt.search_text()
         assert "Vendor: Coffee Shop" in text
-        assert "Expense type: personal" in text
+        assert "Expense type: business" in text
 
     def test_items_with_none_descriptions(self) -> None:
         receipt = Receipt(
@@ -188,7 +188,7 @@ class TestSearchText:
         """Old receipts stored without expense_type get the default."""
         old_json = '{"vendor_name": "Old Store", "total": 10.0}'
         receipt = Receipt.model_validate_json(old_json)
-        assert receipt.expense_type == "personal"
+        assert receipt.expense_type == "business"
 
 
 class TestImportability:
