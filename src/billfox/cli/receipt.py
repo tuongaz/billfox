@@ -434,6 +434,8 @@ def search(
 
         logging.basicConfig(level=logging.DEBUG)
 
+    if query is not None and not query.strip():
+        query = None
     if query is None and not where:
         raise typer.BadParameter(
             "Provide a search query or --where condition (or both)."
@@ -526,6 +528,15 @@ def list_receipts(
             " Monetary fields auto-include currency."
         ),
     ),
+    where: list[str] | None = typer.Option(
+        None, "--where", "-w",
+        help=(
+            "Filter by numeric condition. Repeatable."
+            " Operators: =, >, <, >=, <=."
+            " Fields: total, tax_amount, surcharge_amount, tax_rate."
+            " Example: --where 'total>50' --where 'tax_amount<=10'"
+        ),
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
@@ -539,6 +550,7 @@ def list_receipts(
         raise typer.BadParameter("Page must be >= 1.")
 
     parsed_fields = _parse_fields(fields)
+    where_conditions = _parse_where(where) if where else []
 
     offset = (page - 1) * per_page
 
@@ -561,6 +573,22 @@ def list_receipts(
 
         rprint(f"[red]Error:[/red] {escape(str(e))}")
         raise typer.Exit(code=1) from None
+
+    # Apply --where filters
+    if where_conditions:
+        filtered_items: list[tuple[str, Any]] = []
+        for doc_id, doc in items:
+            data = doc.model_dump()
+            match = True
+            for field, op_func, value in where_conditions:
+                field_val = data.get(field)
+                if field_val is None or not op_func(float(field_val), value):
+                    match = False
+                    break
+            if match:
+                filtered_items.append((doc_id, doc))
+        items = filtered_items
+        total = len(items)
 
     total_pages = (total + per_page - 1) // per_page if total > 0 else 1
 
