@@ -1,4 +1,7 @@
-.PHONY: test lint format typecheck build publish release
+.PHONY: test lint format typecheck build publish release run
+
+run:
+	uv run --all-extras billfox
 
 test:
 	python3 -m pytest tests/ -v
