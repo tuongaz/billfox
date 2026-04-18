@@ -105,6 +105,7 @@ Options:
 - `--db, -d` — SQLite database path (defaults to `~/.billfox/receipts.db`).
 - `--limit, -l` — Maximum number of results (default: 20).
 - `--mode, -m` — Search mode: `hybrid` (default), `vector`, or `bm25`.
+- `--fields, -f` — Comma-separated fields to include in output. Supports top-level fields (e.g. `vendor_name,total`) and nested item fields with dot notation (e.g. `items.description,items.total`). Use `items` for full item objects. When monetary fields (total, tax_amount, surcharge_amount) or item monetary fields (items.total, items.tax_amount) are requested, currency is auto-included.
 - `--json, -j` — Output machine-readable JSON.
 - `--verbose, -v` — Enable debug output.
 
@@ -116,6 +117,7 @@ Options:
 - `--db, -d` — SQLite database path (defaults to `~/.billfox/receipts.db`).
 - `--page, -p` — Page number, starts at 1 (default: 1).
 - `--per-page, -n` — Items per page (default: 20).
+- `--fields, -f` — Comma-separated fields to include in output. Supports top-level fields (e.g. `vendor_name,total`) and nested item fields with dot notation (e.g. `items.description,items.total`). Use `items` for full item objects. When monetary fields (total, tax_amount, surcharge_amount) or item monetary fields (items.total, items.tax_amount) are requested, currency is auto-included.
 - `--json, -j` — Output machine-readable JSON.
 - `--verbose, -v` — Enable debug output.
 

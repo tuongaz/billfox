@@ -16,6 +16,108 @@ import billfox.cli._helpers as _helpers
 
 RECEIPT_EMBED_FIELDS = ["search_text"]
 
+# ── field selection helpers ─────────────────────────────────────
+
+_CURRENCY_FIELDS = {"total", "tax_amount", "surcharge_amount"}
+_ITEM_CURRENCY_FIELDS = {"total", "tax_amount"}
+_RECEIPT_FIELD_NAMES: set[str] | None = None
+_RECEIPT_ITEM_FIELD_NAMES: set[str] | None = None
+
+
+def _get_receipt_field_names() -> set[str]:
+    global _RECEIPT_FIELD_NAMES
+    if _RECEIPT_FIELD_NAMES is None:
+        from billfox.models.receipt import Receipt
+        _RECEIPT_FIELD_NAMES = set(Receipt.model_fields.keys())
+    return _RECEIPT_FIELD_NAMES
+
+
+def _get_receipt_item_field_names() -> set[str]:
+    global _RECEIPT_ITEM_FIELD_NAMES
+    if _RECEIPT_ITEM_FIELD_NAMES is None:
+        from billfox.models.receipt import ReceiptItem
+        _RECEIPT_ITEM_FIELD_NAMES = set(ReceiptItem.model_fields.keys())
+    return _RECEIPT_ITEM_FIELD_NAMES
+
+
+def _parse_fields(raw: str | None) -> tuple[list[str], list[str] | None] | None:
+    """Parse ``--fields`` value.
+
+    Returns ``None`` when *raw* is omitted (show defaults), otherwise a tuple
+    ``(top_level_fields, item_subfields)`` where *item_subfields* is ``None``
+    when bare ``items`` was requested (meaning full ReceiptItem objects).
+    """
+    if raw is None:
+        return None
+    names = [f.strip() for f in raw.split(",") if f.strip()]
+    if not names:
+        return None
+
+    top_fields: list[str] = []
+    item_subfields: list[str] = []
+    has_bare_items = False
+    valid_top = _get_receipt_field_names()
+    valid_item = _get_receipt_item_field_names()
+
+    for name in names:
+        if name == "items":
+            has_bare_items = True
+            if "items" not in top_fields:
+                top_fields.append("items")
+        elif name.startswith("items."):
+            subfield = name[len("items."):]
+            if subfield not in valid_item:
+                raise typer.BadParameter(
+                    f"Unknown items subfield: {subfield!r}. "
+                    f"Valid: {', '.join(sorted(valid_item))}"
+                )
+            if "items" not in top_fields:
+                top_fields.append("items")
+            if subfield not in item_subfields:
+                item_subfields.append(subfield)
+        else:
+            if name not in valid_top:
+                raise typer.BadParameter(
+                    f"Unknown field: {name!r}. "
+                    f"Valid: {', '.join(sorted(valid_top))}"
+                )
+            if name not in top_fields:
+                top_fields.append(name)
+
+    # Auto-include currency for monetary fields
+    needs_currency = bool(_CURRENCY_FIELDS & set(top_fields))
+    if item_subfields:
+        needs_currency = needs_currency or bool(_ITEM_CURRENCY_FIELDS & set(item_subfields))
+    if needs_currency and "currency" not in top_fields:
+        top_fields.append("currency")
+
+    # bare "items" → None (full items); items.foo → list; both → None (bare wins)
+    resolved_item_subs: list[str] | None = None
+    if "items" in top_fields and not has_bare_items and item_subfields:
+        resolved_item_subs = item_subfields
+
+    return (top_fields, resolved_item_subs)
+
+
+def _filter_dict(
+    d: dict[str, Any],
+    parsed: tuple[list[str], list[str] | None] | None,
+) -> dict[str, Any]:
+    """Filter *d* to only the requested fields. Passthrough when *parsed* is ``None``."""
+    if parsed is None:
+        return d
+    top_fields, item_subfields = parsed
+    top_set = set(top_fields)
+    result = {k: v for k, v in d.items() if k in top_set}
+    if "items" in result and item_subfields is not None and result.get("items"):
+        sub_set = set(item_subfields)
+        result["items"] = [
+            {k: v for k, v in item.items() if k in sub_set}
+            for item in result["items"]
+        ]
+    return result
+
+
 receipt_app: Any = typer.Typer(
     name="receipt",
     help="Parse, search, list, delete and edit receipts.",
@@ -171,7 +273,11 @@ def parse(
 # ── search ───────────────────────────────────────────────────────
 
 
-def _display_search_results(results: list[Any]) -> None:
+def _display_search_results(
+    results: list[Any],
+    *,
+    parsed_fields: tuple[list[str], list[str] | None] | None = None,
+) -> None:
     """Display search results as a formatted rich table."""
     try:
         from rich.console import Console
@@ -195,13 +301,30 @@ def _display_search_results(results: list[Any]) -> None:
     table.add_column("Rank", style="dim")
     table.add_column("Document ID", style="bold")
     table.add_column("Score", justify="right")
-    table.add_column("Data")
 
-    for i, r in enumerate(results, 1):
-        data_str = json.dumps(r.data, default=str)
-        if len(data_str) > 80:
-            data_str = data_str[:77] + "..."
-        table.add_row(str(i), r.document_id, f"{r.score:.4f}", data_str)
+    if parsed_fields is None:
+        table.add_column("Data")
+        for i, r in enumerate(results, 1):
+            data_str = json.dumps(r.data, default=str)
+            if len(data_str) > 80:
+                data_str = data_str[:77] + "..."
+            table.add_row(str(i), r.document_id, f"{r.score:.4f}", data_str)
+    else:
+        top_fields, item_subfields = parsed_fields
+        display_fields = [f for f in top_fields if f != "document_id"]
+        for f in display_fields:
+            justify = "right" if f in ("total", "tax_amount", "surcharge_amount", "tax_rate") else "left"
+            table.add_column(f, justify=justify)
+
+        for i, r in enumerate(results, 1):
+            filtered = _filter_dict(r.data, parsed_fields)
+            row: list[str] = [str(i), r.document_id, f"{r.score:.4f}"]
+            for f in display_fields:
+                val = filtered.get(f)
+                if f == "items" and isinstance(val, list):
+                    val = json.dumps(val, default=str)
+                row.append(str(val if val is not None else ""))
+            table.add_row(*row)
 
     console.print(table)
 
@@ -218,6 +341,15 @@ def search(
     mode: str = typer.Option(
         "hybrid", "--mode", "-m", help="Search mode: hybrid, vector, or bm25.",
     ),
+    fields: str | None = typer.Option(
+        None, "--fields", "-f",
+        help=(
+            "Comma-separated fields to include in output"
+            " (e.g. vendor_name,total,items.description)."
+            " Supports dot notation for item subfields."
+            " Monetary fields auto-include currency."
+        ),
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
@@ -231,6 +363,8 @@ def search(
         raise typer.BadParameter(
             f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
         )
+
+    parsed_fields = _parse_fields(fields)
 
     async def _run() -> list[Any]:
         from billfox.models.receipt import Receipt
@@ -262,7 +396,7 @@ def search(
                 {
                     "document_id": r.document_id,
                     "score": r.score,
-                    "data": r.data,
+                    "data": _filter_dict(r.data, parsed_fields),
                     "signals": dict(r.signals),
                 }
                 for r in results
@@ -273,7 +407,7 @@ def search(
         sys.stdout.write(output_text)
         sys.stdout.write("\n")
     else:
-        _display_search_results(results)
+        _display_search_results(results, parsed_fields=parsed_fields)
 
 
 # ── list ─────────────────────────────────────────────────────────
@@ -288,6 +422,15 @@ def list_receipts(
     ),
     page: int = typer.Option(1, "--page", "-p", help="Page number (starts at 1)."),
     per_page: int = typer.Option(20, "--per-page", "-n", help="Items per page."),
+    fields: str | None = typer.Option(
+        None, "--fields", "-f",
+        help=(
+            "Comma-separated fields to include in output"
+            " (e.g. vendor_name,total,items.description)."
+            " Supports dot notation for item subfields."
+            " Monetary fields auto-include currency."
+        ),
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
@@ -299,6 +442,8 @@ def list_receipts(
 
     if page < 1:
         raise typer.BadParameter("Page must be >= 1.")
+
+    parsed_fields = _parse_fields(fields)
 
     offset = (page - 1) * per_page
 
@@ -332,7 +477,7 @@ def list_receipts(
                 "total": total,
                 "total_pages": total_pages,
                 "items": [
-                    {"document_id": doc_id, "data": data.model_dump()}
+                    {"document_id": doc_id, "data": _filter_dict(data.model_dump(), parsed_fields)}
                     for doc_id, data in items
                 ],
             },
@@ -342,7 +487,7 @@ def list_receipts(
         sys.stdout.write(output_text)
         sys.stdout.write("\n")
     else:
-        _display_list_results(items, page=page, total=total, total_pages=total_pages)
+        _display_list_results(items, page=page, total=total, total_pages=total_pages, parsed_fields=parsed_fields)
 
 
 def _display_list_results(
@@ -351,6 +496,7 @@ def _display_list_results(
     page: int,
     total: int,
     total_pages: int,
+    parsed_fields: tuple[list[str], list[str] | None] | None = None,
 ) -> None:
     """Display list results as a formatted rich table."""
     try:
@@ -373,30 +519,50 @@ def _display_list_results(
     table = Table(title=f"Receipts — page {page}/{total_pages} ({total} total)")
     table.add_column("#", style="dim")
     table.add_column("Document ID", style="bold")
-    table.add_column("Vendor")
-    table.add_column("Items")
-    table.add_column("Total", justify="right")
-    table.add_column("Date")
-    table.add_column("Currency")
-    table.add_column("Type")
 
-    for idx, (doc_id, data) in enumerate(items, 1):
-        d = data.model_dump()
-        item_names = ", ".join(
-            item["description"]
-            for item in (d.get("items") or [])
-            if item.get("description")
-        )
-        table.add_row(
-            str(idx),
-            doc_id,
-            str(d.get("vendor_name") or ""),
-            item_names,
-            str(d.get("total") or ""),
-            str(d.get("expense_date") or ""),
-            str(d.get("currency") or ""),
-            str(d.get("expense_type") or "personal"),
-        )
+    if parsed_fields is None:
+        # Original fixed columns
+        table.add_column("Vendor")
+        table.add_column("Items")
+        table.add_column("Total", justify="right")
+        table.add_column("Date")
+        table.add_column("Currency")
+        table.add_column("Type")
+
+        for idx, (doc_id, data) in enumerate(items, 1):
+            d = data.model_dump()
+            item_names = ", ".join(
+                item["description"]
+                for item in (d.get("items") or [])
+                if item.get("description")
+            )
+            table.add_row(
+                str(idx),
+                doc_id,
+                str(d.get("vendor_name") or ""),
+                item_names,
+                str(d.get("total") or ""),
+                str(d.get("expense_date") or ""),
+                str(d.get("currency") or ""),
+                str(d.get("expense_type") or "personal"),
+            )
+    else:
+        # Dynamic columns from --fields
+        top_fields = parsed_fields[0]
+        display_fields = [f for f in top_fields if f != "document_id"]
+        for f in display_fields:
+            justify = "right" if f in ("total", "tax_amount", "surcharge_amount", "tax_rate") else "left"
+            table.add_column(f, justify=justify)
+
+        for idx, (doc_id, data) in enumerate(items, 1):
+            filtered = _filter_dict(data.model_dump(), parsed_fields)
+            row: list[str] = [str(idx), doc_id]
+            for f in display_fields:
+                val = filtered.get(f)
+                if f == "items" and isinstance(val, list):
+                    val = json.dumps(val, default=str)
+                row.append(str(val if val is not None else ""))
+            table.add_row(*row)
 
     console.print(table)
 

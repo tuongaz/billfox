@@ -390,6 +390,165 @@ class TestReceiptListCommand:
         assert "--db" in result.output
 
 
+class TestReceiptListFieldsCommand:
+    """Tests for --fields flag on the receipt list subcommand."""
+
+    def _make_mock_store(self) -> MagicMock:
+        mock_data = MagicMock()
+        mock_data.model_dump.return_value = {
+            "vendor_name": "Acme",
+            "total": 42.0,
+            "currency": "AUD",
+            "expense_date": "2025-01-15",
+            "expense_type": "business",
+            "tax_amount": 3.82,
+            "items": [
+                {"description": "Widget", "total": 42.0, "tax_amount": 3.82, "tags": []},
+            ],
+            "tags": ["office"],
+            "view_tags": [],
+        }
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(return_value=([("doc1", mock_data)], 1))
+        return mock_store
+
+    def test_list_fields_json(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--json", "--fields", "vendor_name,total"]
+            )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        data = parsed["items"][0]["data"]
+        assert set(data.keys()) == {"vendor_name", "total", "currency"}
+        assert data["vendor_name"] == "Acme"
+        assert data["total"] == 42.0
+        assert data["currency"] == "AUD"
+
+    def test_list_fields_table(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--fields", "vendor_name"]
+            )
+        assert result.exit_code == 0
+        assert "Acme" in result.output
+
+    def test_list_fields_invalid(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--fields", "bogus"]
+            )
+        assert result.exit_code != 0
+        assert "Unknown field" in result.output
+
+    def test_list_fields_auto_currency(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--json", "--fields", "total"]
+            )
+        assert result.exit_code == 0
+        data = json.loads(result.output)["items"][0]["data"]
+        assert "currency" in data
+
+    def test_list_fields_items_bare(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--json", "--fields", "items"]
+            )
+        assert result.exit_code == 0
+        data = json.loads(result.output)["items"][0]["data"]
+        assert "items" in data
+        # Full item objects — all subfields present
+        assert "description" in data["items"][0]
+        assert "total" in data["items"][0]
+        assert "tax_amount" in data["items"][0]
+
+    def test_list_fields_items_subfields(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--json", "--fields", "items.description,items.total"]
+            )
+        assert result.exit_code == 0
+        data = json.loads(result.output)["items"][0]["data"]
+        assert "items" in data
+        # Filtered — only description and total
+        item = data["items"][0]
+        assert set(item.keys()) == {"description", "total"}
+        assert item["description"] == "Widget"
+        # currency auto-included because items.total requested
+        assert "currency" in data
+
+    def test_list_fields_items_invalid_subfield(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--fields", "items.bogus"]
+            )
+        assert result.exit_code != 0
+        assert "Unknown items subfield" in result.output
+
+    def test_list_fields_items_subfield_auto_currency(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "list", "--db", "/tmp/t.db", "--json", "--fields", "items.total"]
+            )
+        assert result.exit_code == 0
+        data = json.loads(result.output)["items"][0]["data"]
+        assert "currency" in data
+
+
+class TestReceiptSearchFieldsCommand:
+    """Tests for --fields flag on the receipt search subcommand."""
+
+    def _make_mock_store(self) -> MagicMock:
+        mock_result = MagicMock()
+        mock_result.document_id = "doc1"
+        mock_result.score = 0.95
+        mock_result.data = {
+            "vendor_name": "Acme",
+            "total": 42.0,
+            "currency": "AUD",
+            "expense_date": "2025-01-15",
+            "items": [{"description": "Widget", "total": 42.0}],
+            "tags": ["office"],
+        }
+        mock_result.signals = {"bm25": 0.8, "vector": 0.9}
+
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(return_value=[mock_result])
+        return mock_store
+
+    def test_search_fields_json(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "search", "acme", "--db", "/tmp/t.db", "--json", "--fields", "vendor_name"]
+            )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed[0]["document_id"] == "doc1"
+        assert parsed[0]["score"] == 0.95
+        assert set(parsed[0]["data"].keys()) == {"vendor_name"}
+
+    def test_search_fields_invalid(self) -> None:
+        mock_store = self._make_mock_store()
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, ["receipt", "search", "acme", "--db", "/tmp/t.db", "--fields", "bogus"]
+            )
+        assert result.exit_code != 0
+        assert "Unknown field" in result.output
+
+
 class TestReceiptGetCommand:
     """Tests for the receipt get subcommand."""
 

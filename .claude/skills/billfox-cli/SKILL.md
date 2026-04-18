@@ -50,6 +50,7 @@ billfox receipt list [options]
 | `--db` | Database path |
 | `--page` | Page number (default: 1) |
 | `--per-page` | Results per page (default: 20) |
+| `--fields, -f` | Comma-separated fields to return. Supports dot notation for item subfields (e.g. `items.description`). Use `items` for full item objects. Monetary fields auto-include currency. |
 | `--json` | Output as JSON |
 
 ### Search receipts
@@ -63,6 +64,7 @@ billfox receipt search <query> [options]
 | `--db` | Database path |
 | `--limit` | Max results (default: 10) |
 | `--mode` | Search mode: `hybrid` (default), `vector`, `bm25` |
+| `--fields, -f` | Comma-separated fields to return. Supports dot notation for item subfields (e.g. `items.description`). Use `items` for full item objects. Monetary fields auto-include currency. |
 | `--json` | Output as JSON |
 
 Search modes:
