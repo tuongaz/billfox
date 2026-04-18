@@ -397,7 +397,7 @@ def _display_search_results(
 
 @receipt_app.command()  # type: ignore[untyped-decorator]
 def search(
-    query: str = typer.Argument(..., help="Search query."),
+    query: str | None = typer.Argument(None, help="Search query (optional when --where is used)."),
     db: str = typer.Option(
         str(Path.home() / ".billfox" / "receipts.db"),
         "--db", "-d",
@@ -434,6 +434,11 @@ def search(
 
         logging.basicConfig(level=logging.DEBUG)
 
+    if query is None and not where:
+        raise typer.BadParameter(
+            "Provide a search query or --where condition (or both)."
+        )
+
     if mode not in ("hybrid", "vector", "bm25"):
         raise typer.BadParameter(
             f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
@@ -455,7 +460,19 @@ def search(
             embed_fields=RECEIPT_EMBED_FIELDS,
         )
         try:
-            return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
+            if query is not None:
+                return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
+            # --where only: fetch all documents, wrap as SearchResult
+            from billfox._types import SearchResult
+            items, _total = await store_instance.list_documents(limit=limit, offset=0)
+            return [
+                SearchResult(
+                    document_id=doc_id,
+                    data=doc.model_dump(),
+                    score=0.0,
+                )
+                for doc_id, doc in items
+            ]
         finally:
             await store_instance.close()
 
