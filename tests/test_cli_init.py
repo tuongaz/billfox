@@ -30,10 +30,11 @@ class TestInitDoclingOpenAILocal:
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
+        # 1=Docling, 1=OpenAI, 1=OpenAI embedding, 1=Local backup
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n1\n1\n{backup_path}\n",
+            input=f"1\n1\n1\n1\n{backup_path}\n",
         )
 
         assert result.exit_code == 0
@@ -45,6 +46,9 @@ class TestInitDoclingOpenAILocal:
         # LLM
         assert config["defaults"]["llm"]["provider"] == "openai"
         assert config["defaults"]["llm"]["model"] == "openai:gpt-4.1"
+        # Embedding
+        assert config["defaults"]["embedding"]["provider"] == "openai"
+        assert config["defaults"]["embedding"]["model"] == "text-embedding-3-small"
         # Backup
         assert config["defaults"]["backup"]["provider"] == "local"
         assert config["defaults"]["backup"]["local_path"] == backup_path
@@ -60,10 +64,11 @@ class TestInitDoclingOpenAILocal:
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
+        # 1=Docling, 1=OpenAI, 1=OpenAI embedding, 1=Local backup
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n1\n1\n{backup_path}\n",
+            input=f"1\n1\n1\n1\n{backup_path}\n",
         )
 
         assert result.exit_code == 0
@@ -85,10 +90,11 @@ class TestInitMistralClaudeGDrive:
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
+        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="2\n2\n2\n",
+            input="2\n2\n3\n2\n",
         )
 
         assert result.exit_code == 0
@@ -98,6 +104,7 @@ class TestInitMistralClaudeGDrive:
         assert config["defaults"]["ocr"]["provider"] == "mistral"
         assert config["defaults"]["llm"]["provider"] == "anthropic"
         assert config["defaults"]["llm"]["model"] == "anthropic:claude-sonnet-4-20250514"
+        assert config["defaults"]["embedding"]["provider"] == "none"
         assert config["defaults"]["backup"]["provider"] == "google_drive"
         assert "local_path" not in config["defaults"]["backup"]
         assert "ollama" not in config["defaults"]
@@ -109,10 +116,11 @@ class TestInitMistralClaudeGDrive:
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
+        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="2\n2\n2\n",
+            input="2\n2\n3\n2\n",
         )
 
         assert result.exit_code == 0
@@ -126,10 +134,11 @@ class TestInitMistralClaudeGDrive:
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
+        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="2\n2\n2\n",
+            input="2\n2\n3\n2\n",
         )
 
         assert result.exit_code == 0
@@ -155,10 +164,11 @@ class TestInitOllama:
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
+        # 1=Docling, 3=Ollama LLM, base_url, model, 3=None embedding, 1=Local backup
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n3\nhttp://myhost:11434\nmymodel\n1\n{backup_path}\n",
+            input=f"1\n3\nhttp://myhost:11434\nmymodel\n3\n1\n{backup_path}\n",
         )
 
         assert result.exit_code == 0
@@ -180,10 +190,11 @@ class TestInitOllama:
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
+        # 1=Docling, 3=Ollama LLM, base_url, model, 3=None embedding, 1=Local backup
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n3\nhttp://localhost:11434\nllama3.2\n1\n{backup_path}\n",
+            input=f"1\n3\nhttp://localhost:11434\nllama3.2\n3\n1\n{backup_path}\n",
         )
 
         assert result.exit_code == 0
@@ -224,8 +235,8 @@ class TestInitOverwriteConfirmation:
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # y=overwrite, 1=Docling, 1=OpenAI, 2=Google Drive
-        result = runner.invoke(app, ["init"], input="y\n1\n1\n2\n")
+        # y=overwrite, 1=Docling, 1=OpenAI, 1=OpenAI embedding, 2=Google Drive
+        result = runner.invoke(app, ["init"], input="y\n1\n1\n1\n2\n")
 
         assert result.exit_code == 0
         mock_write.assert_called_once()
@@ -240,8 +251,8 @@ class TestInitOverwriteConfirmation:
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # --yes skips overwrite prompt; 1=Docling, 1=OpenAI, 2=Google Drive
-        result = runner.invoke(app, ["init", "--yes"], input="1\n1\n2\n")
+        # --yes skips overwrite prompt; 1=Docling, 1=OpenAI, 1=OpenAI embedding, 2=Google Drive
+        result = runner.invoke(app, ["init", "--yes"], input="1\n1\n1\n2\n")
 
         assert result.exit_code == 0
         mock_write.assert_called_once()

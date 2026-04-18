@@ -228,12 +228,27 @@ def resolve_llm_model(
 
 
 def try_build_embedder() -> Any:
-    """Try to build an OpenAI embedder from env or config."""
+    """Try to build an embedder from config (Ollama or OpenAI)."""
     import os
 
+    config = read_config()
+    embedding_provider = get_nested(config, "defaults.embedding.provider")
+
+    if embedding_provider == "ollama":
+        embedding_model = get_nested(config, "defaults.embedding.model")
+        if not embedding_model:
+            return None
+        base_url = get_nested(config, "defaults.ollama.base_url")
+        from billfox.embed.ollama import OllamaEmbedder
+
+        return OllamaEmbedder(model=embedding_model, base_url=base_url)
+
+    if embedding_provider == "none":
+        return None
+
+    # Default / "openai" provider
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        config = read_config()
         api_key_val = get_nested(config, "api_keys.openai")
         if isinstance(api_key_val, str):
             api_key = api_key_val

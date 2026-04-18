@@ -94,11 +94,11 @@ class TestInitWizardOllamaIntegration:
 
         runner = CliRunner()
         # Choices: OCR=1 (Docling), LLM=3 (Ollama), base_url=default,
-        # model selection=2 (codellama:7b), backup=1 (local), backup path=default
+        # model selection=2 (codellama:7b), embedding=3 (None), backup=1 (local), backup path=default
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="1\n3\nhttp://localhost:11434\n2\n1\n\n",
+            input="1\n3\nhttp://localhost:11434\n2\n3\n1\n\n",
         )
 
         assert result.exit_code == 0
@@ -127,11 +127,11 @@ class TestInitWizardOllamaIntegration:
 
         runner = CliRunner()
         # Choices: OCR=1, LLM=3 (Ollama), base_url=default,
-        # manual model name=mymodel, backup=1 (local), backup path=default
+        # manual model name=mymodel, embedding=3 (None), backup=1 (local), backup path=default
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="1\n3\nhttp://localhost:11434\nmymodel\n1\n\n",
+            input="1\n3\nhttp://localhost:11434\nmymodel\n3\n1\n\n",
         )
 
         assert result.exit_code == 0
@@ -158,11 +158,11 @@ class TestInitWizardOllamaIntegration:
 
         runner = CliRunner()
         # Choices: OCR=1, LLM=3, base_url=default,
-        # manual model=llama3.2 (default), backup=1, backup path=default
+        # manual model=llama3.2 (default), embedding=3 (None), backup=1, backup path=default
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="1\n3\nhttp://localhost:11434\nllama3.2\n1\n\n",
+            input="1\n3\nhttp://localhost:11434\nllama3.2\n3\n1\n\n",
         )
 
         assert result.exit_code == 0

@@ -123,6 +123,56 @@ def init(
         ollama_model = ollama_model_name
         llm_model = f"ollama:{ollama_model_name}"
 
+    # ── Embedding Provider ───────────────────────────────────────
+    embedding_choices = ["OpenAI", "Ollama", "None"]
+    embedding_descs = ["API, requires key", "local, no key needed", "skip embeddings (no vector search)"]
+
+    embedding_choice = _prompt_choice(
+        "Select embedding provider (for vector search):",
+        embedding_choices,
+        embedding_descs,
+    )
+
+    embedding_provider: str
+    embedding_model: str | None = None
+
+    if embedding_choice == 1:
+        embedding_provider = "openai"
+        embedding_model = "text-embedding-3-small"
+    elif embedding_choice == 2:
+        embedding_provider = "ollama"
+        # Reuse ollama_base_url if already set from LLM selection
+        emb_base_url = ollama_base_url
+        if emb_base_url is None:
+            emb_base_url = typer.prompt(
+                "Ollama base URL",
+                default="http://localhost:11434",
+            )
+            ollama_base_url = emb_base_url
+
+        console.print(f"\n[dim]Checking Ollama at {emb_base_url}...[/dim]")
+        emb_available_models = _check_ollama(emb_base_url)
+
+        if emb_available_models and len(emb_available_models) > 0:
+            console.print(f"[green]Connected! Found {len(emb_available_models)} model(s):[/green]")
+            emb_model_idx = _prompt_choice(
+                "Select an embedding model:",
+                emb_available_models,
+                [""] * len(emb_available_models),
+            )
+            embedding_model = emb_available_models[emb_model_idx - 1]
+        else:
+            if emb_available_models is not None:
+                console.print("[yellow]Connected to Ollama but no models found.[/yellow]")
+            else:
+                console.print(
+                    f"[yellow]Could not connect to Ollama at {emb_base_url}.[/yellow]"
+                )
+            console.print("[dim]You can pull models later with: ollama pull <model>[/dim]")
+            embedding_model = typer.prompt("Ollama embedding model name", default="nomic-embed-text")
+    else:
+        embedding_provider = "none"
+
     # ── Backup Provider ──────────────────────────────────────────
     backup_choice = _prompt_choice(
         "Select backup provider:",
@@ -152,9 +202,13 @@ def init(
         "defaults": {
             "ocr": {"provider": ocr_provider},
             "llm": {"provider": llm_provider, "model": llm_model},
+            "embedding": {"provider": embedding_provider},
             "backup": {"provider": backup_provider},
         },
     }
+
+    if embedding_model is not None:
+        config["defaults"]["embedding"]["model"] = embedding_model
 
     if ollama_base_url is not None:
         config["defaults"]["ollama"] = {
@@ -177,13 +231,19 @@ def init(
         env_lines.append("MISTRAL_API_KEY=your-key-here")
         env_guidance.append("Mistral OCR requires MISTRAL_API_KEY")
 
-    if llm_provider == "openai":
+    needs_openai_key = llm_provider == "openai" or embedding_provider == "openai"
+    if needs_openai_key:
         env_lines.append("OPENAI_API_KEY=your-key-here")
-        env_guidance.append("OpenAI LLM requires OPENAI_API_KEY")
-    elif llm_provider == "anthropic":
+        uses = []
+        if llm_provider == "openai":
+            uses.append("LLM")
+        if embedding_provider == "openai":
+            uses.append("embeddings")
+        env_guidance.append(f"OpenAI {' + '.join(uses)} requires OPENAI_API_KEY")
+
+    if llm_provider == "anthropic":
         env_lines.append("ANTHROPIC_API_KEY=your-key-here")
         env_guidance.append("Claude LLM requires ANTHROPIC_API_KEY")
-    # Ollama: no API key needed
 
     if env_lines:
         console.print("\n[bold]Required environment variables:[/bold]")
