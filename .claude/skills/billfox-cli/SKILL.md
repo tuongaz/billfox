@@ -7,6 +7,8 @@ description: Guide for using the billfox CLI to manage receipts — parsing, sto
 
 Receipt and invoice data extraction CLI. Processes documents through OCR and LLM parsing into a searchable SQLite database.
 
+If `billfox` is not installed, use `uvx billfox` instead (e.g. `uvx billfox receipt list`).
+
 ## Golden Rule: Minimal Data Fetching
 
 **ALWAYS use `--fields` to request only the data needed.** Never fetch full receipts when a subset of fields answers the question.
