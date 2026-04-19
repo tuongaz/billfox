@@ -184,6 +184,25 @@ def _apply_where(
     return filtered
 
 
+def _apply_item_updates(
+    existing_items: list[Any],
+    item_patches: dict[int, dict[str, Any]],
+) -> list[Any]:
+    """Apply partial updates to specific items by index.
+
+    Returns a new list with patches applied via ``model_copy``.
+    Raises ``ValueError`` if any index is out of range.
+    """
+    updated = list(existing_items)
+    for idx, patch in item_patches.items():
+        if idx < 0 or idx >= len(updated):
+            raise ValueError(
+                f"Item index {idx} out of range (receipt has {len(updated)} items)."
+            )
+        updated[idx] = updated[idx].model_copy(update=patch)
+    return updated
+
+
 receipt_app: Any = typer.Typer(
     name="receipt",
     help="Parse, search, list, delete and edit receipts.",
@@ -802,6 +821,11 @@ def edit_receipt(
     invoice_number: str | None = typer.Option(None, "--invoice-number", help="Invoice number."),
     tags: str | None = typer.Option(None, "--tags", help="Comma-separated tags."),
     expense_type: str | None = typer.Option(None, "--expense-type", help="Expense type (business or personal)."),
+    item_index: int | None = typer.Option(None, "--item-index", help="Index of item to edit (0-based)."),
+    item_description: str | None = typer.Option(None, "--item-description", help="Item description."),
+    item_total: float | None = typer.Option(None, "--item-total", help="Item total amount."),
+    item_tax_amount: float | None = typer.Option(None, "--item-tax-amount", help="Item tax amount."),
+    item_tags: str | None = typer.Option(None, "--item-tags", help="Comma-separated item tags."),
     db: str = typer.Option(
         str(Path.home() / ".billfox" / "receipts.db"),
         "--db", "-d",
@@ -818,6 +842,7 @@ def edit_receipt(
 
     # Build updates from --data JSON
     updates: dict[str, Any] = {}
+    item_patches: dict[int, dict[str, Any]] = {}
     if data is not None:
         try:
             updates = json.loads(data)
@@ -827,6 +852,22 @@ def edit_receipt(
         if not isinstance(updates, dict):
             rprint("[red]Error:[/red] --data must be a JSON object.")
             raise typer.Exit(code=1)
+
+        # Detect partial item updates: {"items": {"0": {...}}}
+        raw_items = updates.get("items")
+        if isinstance(raw_items, dict):
+            for key, patch in raw_items.items():
+                try:
+                    idx = int(key)
+                except ValueError:
+                    rprint(f"[red]Error:[/red] Item index must be an integer, got {key!r}.")
+                    raise typer.Exit(code=1) from None
+                if not isinstance(patch, dict):
+                    rprint(f"[red]Error:[/red] Item patch at index {key} must be a JSON object.")
+                    raise typer.Exit(code=1) from None
+                item_patches[idx] = patch
+            del updates["items"]
+        # If raw_items is a list, it stays in updates as a full replacement (backward compat)
 
     # Individual flags override --data values
     if vendor_name is not None:
@@ -853,13 +894,40 @@ def edit_receipt(
             raise typer.Exit(code=1)
         updates["expense_type"] = expense_type
 
-    if not updates:
+    # Item-level flags
+    if item_index is not None:
+        item_update: dict[str, Any] = {}
+        if item_description is not None:
+            item_update["description"] = item_description
+        if item_total is not None:
+            item_update["total"] = item_total
+        if item_tax_amount is not None:
+            item_update["tax_amount"] = item_tax_amount
+        if item_tags is not None:
+            item_update["tags"] = [t.strip() for t in item_tags.split(",")]
+        if item_update:
+            item_patches[item_index] = item_update
+        else:
+            rprint("[yellow]--item-index provided but no item fields to update.[/yellow]")
+            raise typer.Exit(code=1)
+    elif any(v is not None for v in (item_description, item_total, item_tax_amount, item_tags)):
+        rprint("[red]Error:[/red] --item-description/--item-total/--item-tax-amount/--item-tags require --item-index.")
+        raise typer.Exit(code=1)
+
+    if not updates and not item_patches:
         rprint("[yellow]No updates provided. Use --data or field flags (e.g. --vendor-name).[/yellow]")
         raise typer.Exit(code=1)
 
     async def _run() -> Any:
-        from billfox.models.receipt import Receipt
+        from billfox.models.receipt import Receipt, ReceiptItem
         from billfox.store.sqlite import SQLiteDocumentStore
+
+        # Convert raw dicts in items list to ReceiptItem instances
+        if "items" in updates and isinstance(updates["items"], list):
+            updates["items"] = [
+                ReceiptItem.model_validate(item) if isinstance(item, dict) else item
+                for item in updates["items"]
+            ]
 
         embedder = _helpers.try_build_embedder()
         store_instance: Any = SQLiteDocumentStore(
@@ -872,7 +940,10 @@ def edit_receipt(
             existing = await store_instance.get(document_id)
             if existing is None:
                 return None
-            updated = existing.model_copy(update=updates)
+            updated = existing.model_copy(update=updates) if updates else existing
+            if item_patches:
+                new_items = _apply_item_updates(updated.items, item_patches)
+                updated = updated.model_copy(update={"items": new_items})
             await store_instance.save(document_id, updated)
             return updated
         finally:

@@ -867,6 +867,212 @@ class TestReceiptEditCommand:
         assert result.exit_code == 1
         assert "business" in result.output.lower() or "personal" in result.output.lower()
 
+    def test_edit_item_by_index(self) -> None:
+        from billfox.models.receipt import Receipt, ReceiptItem
+
+        existing = Receipt(
+            vendor_name="Shop",
+            total=20.0,
+            items=[
+                ReceiptItem(description="Item A", total=10.0),
+                ReceiptItem(description="Item B", total=10.0),
+            ],
+        )
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--item-index", "0",
+                    "--item-description", "Updated A",
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["items"][0]["description"] == "Updated A"
+        assert parsed["items"][0]["total"] == 10.0  # unchanged
+        assert parsed["items"][1]["description"] == "Item B"  # unchanged
+
+    def test_edit_item_multiple_fields(self) -> None:
+        from billfox.models.receipt import Receipt, ReceiptItem
+
+        existing = Receipt(
+            vendor_name="Shop",
+            items=[ReceiptItem(description="Item A", total=10.0)],
+        )
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--item-index", "0",
+                    "--item-total", "25.0",
+                    "--item-tags", "food, lunch",
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["items"][0]["total"] == 25.0
+        assert parsed["items"][0]["tags"] == ["food", "lunch"]
+        assert parsed["items"][0]["description"] == "Item A"  # unchanged
+
+    def test_edit_item_index_out_of_range(self) -> None:
+        from billfox.models.receipt import Receipt, ReceiptItem
+
+        existing = Receipt(
+            vendor_name="Shop",
+            items=[ReceiptItem(description="Only item", total=5.0)],
+        )
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--item-index", "5",
+                    "--item-description", "Nope",
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 1
+        assert "out of range" in result.output.lower()
+
+    def test_edit_item_via_json_partial(self) -> None:
+        from billfox.models.receipt import Receipt, ReceiptItem
+
+        existing = Receipt(
+            vendor_name="Shop",
+            items=[
+                ReceiptItem(description="Item A", total=10.0),
+                ReceiptItem(description="Item B", total=20.0),
+            ],
+        )
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--data", '{"items": {"1": {"description": "Updated B"}}}',
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["items"][0]["description"] == "Item A"  # unchanged
+        assert parsed["items"][1]["description"] == "Updated B"
+        assert parsed["items"][1]["total"] == 20.0  # unchanged
+
+    def test_edit_item_via_json_full_replace(self) -> None:
+        from billfox.models.receipt import Receipt, ReceiptItem
+
+        existing = Receipt(
+            vendor_name="Shop",
+            items=[ReceiptItem(description="Old", total=5.0)],
+        )
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--data", '{"items": [{"description": "New", "total": 99.0}]}',
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["items"]) == 1
+        assert parsed["items"][0]["description"] == "New"
+        assert parsed["items"][0]["total"] == 99.0
+
+    def test_edit_item_flags_without_index(self) -> None:
+        result = runner.invoke(
+            app, [
+                "receipt", "edit", "doc1",
+                "--item-description", "X",
+                "--db", "/tmp/test.db",
+            ]
+        )
+        assert result.exit_code == 1
+        assert "--item-index" in result.output
+
+    def test_edit_item_index_without_fields(self) -> None:
+        result = runner.invoke(
+            app, [
+                "receipt", "edit", "doc1",
+                "--item-index", "0",
+                "--db", "/tmp/test.db",
+            ]
+        )
+        assert result.exit_code == 1
+        assert "no item fields" in result.output.lower()
+
+    def test_edit_item_combined_with_top_level(self) -> None:
+        from billfox.models.receipt import Receipt, ReceiptItem
+
+        existing = Receipt(
+            vendor_name="Old Shop",
+            total=30.0,
+            items=[ReceiptItem(description="Item A", total=30.0)],
+        )
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.get = AsyncMock(return_value=existing)
+        mock_store.save = AsyncMock()
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app, [
+                    "receipt", "edit", "doc1",
+                    "--vendor-name", "New Shop",
+                    "--item-index", "0",
+                    "--item-description", "Updated A",
+                    "--db", "/tmp/test.db",
+                ]
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert parsed["vendor_name"] == "New Shop"
+        assert parsed["items"][0]["description"] == "Updated A"
+        assert parsed["items"][0]["total"] == 30.0
+
+    def test_edit_item_json_invalid_index(self) -> None:
+        result = runner.invoke(
+            app, [
+                "receipt", "edit", "doc1",
+                "--data", '{"items": {"abc": {"description": "X"}}}',
+                "--db", "/tmp/test.db",
+            ]
+        )
+        assert result.exit_code == 1
+        assert "integer" in result.output.lower()
+
 
 class TestReceiptHelp:
     """Tests for receipt help output."""
