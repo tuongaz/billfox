@@ -1,6 +1,6 @@
 ---
 name: billfox-cli
-description: Guide for using the billfox CLI to manage receipts — parsing, storing, searching, listing, editing, deleting, and configuring. Use when working with billfox commands, processing receipt/invoice documents, querying the receipt database, or troubleshooting billfox CLI usage.
+description: Guide for using the billfox CLI to manage receipts — adding, storing, searching, listing, editing, deleting, and configuring. Use when working with billfox commands, processing receipt/invoice documents, querying the receipt database, or troubleshooting billfox CLI usage.
 ---
 
 # Billfox CLI
@@ -141,9 +141,9 @@ billfox receipt search "vendor" --json -f vendor_name,total
 
 ## Commands Reference
 
-### `billfox receipt parse <file>`
+### `billfox receipt add <file>`
 
-Parse receipt image/PDF through OCR + LLM and store result.
+Add a receipt by parsing image/PDF through OCR + LLM and storing result.
 
 | Flag | Description |
 |---|---|

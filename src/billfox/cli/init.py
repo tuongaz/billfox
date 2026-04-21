@@ -4,10 +4,29 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from zoneinfo import available_timezones
 
 import httpx
 import typer
 from rich.console import Console
+
+_COMMON_TIMEZONES = [
+    ("Australia/Sydney", "Australia — Sydney (AEST/AEDT)"),
+    ("Australia/Melbourne", "Australia — Melbourne (AEST/AEDT)"),
+    ("Australia/Brisbane", "Australia — Brisbane (AEST)"),
+    ("Australia/Perth", "Australia — Perth (AWST)"),
+    ("Australia/Adelaide", "Australia — Adelaide (ACST/ACDT)"),
+    ("Pacific/Auckland", "New Zealand (NZST/NZDT)"),
+    ("Asia/Tokyo", "Japan (JST)"),
+    ("Asia/Singapore", "Singapore (SGT)"),
+    ("Asia/Shanghai", "China (CST)"),
+    ("Europe/London", "UK (GMT/BST)"),
+    ("Europe/Paris", "Central Europe (CET/CEST)"),
+    ("America/New_York", "US — Eastern (EST/EDT)"),
+    ("America/Chicago", "US — Central (CST/CDT)"),
+    ("America/Denver", "US — Mountain (MST/MDT)"),
+    ("America/Los_Angeles", "US — Pacific (PST/PDT)"),
+]
 
 
 def _check_ollama(base_url: str) -> list[str] | None:
@@ -197,6 +216,42 @@ def init(
             "[bold]billfox auth google-drive[/bold]"
         )
 
+    # ── Timezone ─────────────────────────────────────────────────
+    from billfox.cli._helpers import get_machine_timezone
+
+    detected_tz = get_machine_timezone()
+
+    tz_choices: list[str] = []
+    tz_descriptions: list[str] = []
+
+    if detected_tz:
+        tz_choices.append(detected_tz)
+        tz_descriptions.append(f"detected from system")
+
+    for tz_id, tz_label in _COMMON_TIMEZONES:
+        if tz_id != detected_tz:
+            tz_choices.append(tz_id)
+            tz_descriptions.append(tz_label)
+
+    tz_choices.append("Other")
+    tz_descriptions.append("type IANA timezone manually")
+
+    tz_idx = _prompt_choice("Select your timezone:", tz_choices, tz_descriptions)
+    selected_tz: str
+
+    if tz_choices[tz_idx - 1] == "Other":
+        valid_tzs = available_timezones()
+        while True:
+            raw_tz = typer.prompt("IANA timezone (e.g. America/New_York)")
+            if raw_tz in valid_tzs:
+                selected_tz = raw_tz
+                break
+            console.print(f"[red]Unknown timezone: {raw_tz!r}. Try again.[/red]")
+    else:
+        selected_tz = tz_choices[tz_idx - 1]
+
+    console.print(f"[green]Timezone: {selected_tz}[/green]")
+
     # ── Build config dict ────────────────────────────────────────
     config: dict[str, Any] = {
         "defaults": {
@@ -204,6 +259,7 @@ def init(
             "llm": {"provider": llm_provider, "model": llm_model},
             "embedding": {"provider": embedding_provider},
             "backup": {"provider": backup_provider},
+            "timezone": selected_tz,
         },
     }
 

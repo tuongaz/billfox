@@ -60,7 +60,7 @@ class TestReceiptCommand:
         ):
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         parsed = json.loads(result.output)
@@ -84,7 +84,7 @@ class TestReceiptCommand:
         ):
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1", "--json"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1", "--json"])
 
         assert result.exit_code == 0
         assert "Coffee Shop" in result.output
@@ -108,7 +108,7 @@ class TestReceiptCommand:
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
             result = runner.invoke(app, [
-                "receipt", "parse", str(img),
+                "receipt", "add", str(img),
                 "--model", "openai:gpt-4.1",
                 "--output", str(out),
             ])
@@ -137,7 +137,7 @@ class TestReceiptCommand:
         ):
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         call_kwargs = mock_llm_parser_cls.call_args.kwargs
@@ -168,7 +168,7 @@ class TestReceiptCommand:
             patch("billfox.parse.llm.LLMParser"),
             patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
         ):
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         call_kwargs = mock_store_cls.call_args.kwargs
@@ -195,7 +195,7 @@ class TestReceiptCommand:
             patch("billfox.store.sqlite.SQLiteDocumentStore", mock_store_cls),
         ):
             result = runner.invoke(app, [
-                "receipt", "parse", str(img),
+                "receipt", "add", str(img),
                 "--model", "openai:gpt-4.1",
                 "--store", db_path,
             ])
@@ -223,7 +223,7 @@ class TestReceiptCommand:
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
             mock_build_ext.return_value = MagicMock()
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         mock_build_ext.assert_called_once_with("mistral", None)
@@ -251,7 +251,7 @@ class TestReceiptCommand:
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
             result = runner.invoke(app, [
-                "receipt", "parse", str(img),
+                "receipt", "add", str(img),
                 "--model", "anthropic:claude-sonnet-4-20250514",
             ])
 
@@ -275,14 +275,14 @@ class TestReceiptCommand:
         ):
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 1
         assert "Error" in result.output
 
     def test_receipt_requires_config(self) -> None:
         with patch("billfox.cli._helpers.read_config", return_value={}):
-            result = runner.invoke(app, ["receipt", "parse", "/some/file.jpg"])
+            result = runner.invoke(app, ["receipt", "add", "/some/file.jpg"])
 
         assert result.exit_code == 1
         assert "not configured" in result.output.lower()
@@ -305,7 +305,7 @@ class TestReceiptCommand:
         ):
             mock_store_cls.return_value.close = AsyncMock()
             mock_store_cls.return_value.delete = AsyncMock()
-            result = runner.invoke(app, ["receipt", "parse", str(img), "--model", "openai:gpt-4.1"])
+            result = runner.invoke(app, ["receipt", "add", str(img), "--model", "openai:gpt-4.1"])
 
         assert result.exit_code == 0
         mock_pipeline.run.assert_awaited_once()
@@ -1107,8 +1107,8 @@ class TestReceiptEditCommand:
 class TestReceiptHelp:
     """Tests for receipt help output."""
 
-    def test_receipt_parse_help(self) -> None:
-        result = runner.invoke(app, ["receipt", "parse", "--help"])
+    def test_receipt_add_help(self) -> None:
+        result = runner.invoke(app, ["receipt", "add", "--help"])
         assert result.exit_code == 0
         assert "--model" in result.output
         assert "--output" in result.output
@@ -1122,7 +1122,7 @@ class TestReceiptHelp:
     def test_receipt_subapp_help(self) -> None:
         result = runner.invoke(app, ["receipt", "--help"])
         assert result.exit_code == 0
-        assert "parse" in result.output
+        assert "add" in result.output
         assert "search" in result.output
         assert "list" in result.output
         assert "get" in result.output

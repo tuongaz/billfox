@@ -533,10 +533,10 @@ class TestCLISmokeTest:
         )
         assert result.returncode == 0
 
-    def test_billfox_parse_help(self) -> None:
-        """billfox parse --help exits with code 0."""
+    def test_billfox_add_help(self) -> None:
+        """billfox receipt add --help exits with code 0."""
         result = subprocess.run(
-            [sys.executable, "-m", "billfox", "parse", "--help"],
+            [sys.executable, "-m", "billfox", "receipt", "add", "--help"],
             capture_output=True,
             text=True,
             timeout=30,

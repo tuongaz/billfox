@@ -313,122 +313,68 @@ wheels = [
 name = "billfox"
 source = { editable = "." }
 dependencies = [
+    { name = "aiosqlite" },
+    { name = "anthropic" },
     { name = "docling" },
+    { name = "google-api-python-client" },
+    { name = "google-auth-httplib2" },
+    { name = "google-auth-oauthlib" },
     { name = "httpx" },
+    { name = "mistralai" },
     { name = "numpy" },
     { name = "onnxruntime" },
+    { name = "openai" },
     { name = "pillow" },
     { name = "pydantic" },
+    { name = "pydantic-ai" },
     { name = "python-dotenv" },
     { name = "python-ulid" },
     { name = "rich" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "sqlite-vec" },
     { name = "tomli-w" },
     { name = "typer" },
 ]
 
 [package.optional-dependencies]
-all = [
-    { name = "aiosqlite" },
-    { name = "anthropic" },
-    { name = "google-api-python-client" },
-    { name = "google-auth-httplib2" },
-    { name = "google-auth-oauthlib" },
-    { name = "mistralai" },
-    { name = "openai" },
-    { name = "pydantic-ai" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "sqlite-vec" },
-]
-anthropic = [
-    { name = "anthropic" },
-]
 dev = [
-    { name = "aiosqlite" },
-    { name = "anthropic" },
     { name = "coverage" },
-    { name = "google-api-python-client" },
-    { name = "google-auth-httplib2" },
-    { name = "google-auth-oauthlib" },
-    { name = "mistralai" },
     { name = "mypy" },
-    { name = "openai" },
-    { name = "pydantic-ai" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "ruff" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "sqlite-vec" },
-]
-google-drive = [
-    { name = "google-api-python-client" },
-    { name = "google-auth-httplib2" },
-    { name = "google-auth-oauthlib" },
-]
-llm = [
-    { name = "pydantic-ai" },
-]
-mistral = [
-    { name = "mistralai" },
-]
-openai = [
-    { name = "openai" },
-]
-store = [
-    { name = "aiosqlite" },
-    { name = "sqlalchemy", extra = ["asyncio"] },
-    { name = "sqlite-vec" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "aiosqlite", marker = "extra == 'all'", specifier = ">=0.19" },
-    { name = "aiosqlite", marker = "extra == 'dev'", specifier = ">=0.19" },
-    { name = "aiosqlite", marker = "extra == 'store'", specifier = ">=0.19" },
-    { name = "anthropic", marker = "extra == 'all'", specifier = ">=0.40" },
-    { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.40" },
-    { name = "anthropic", marker = "extra == 'dev'", specifier = ">=0.40" },
+    { name = "aiosqlite", specifier = ">=0.19" },
+    { name = "anthropic", specifier = ">=0.40" },
     { name = "coverage", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "docling", specifier = ">=2.0" },
-    { name = "google-api-python-client", marker = "extra == 'all'", specifier = ">=2.80" },
-    { name = "google-api-python-client", marker = "extra == 'dev'", specifier = ">=2.80" },
-    { name = "google-api-python-client", marker = "extra == 'google-drive'", specifier = ">=2.80" },
-    { name = "google-auth-httplib2", marker = "extra == 'all'", specifier = ">=0.2" },
-    { name = "google-auth-httplib2", marker = "extra == 'dev'", specifier = ">=0.2" },
-    { name = "google-auth-httplib2", marker = "extra == 'google-drive'", specifier = ">=0.2" },
-    { name = "google-auth-oauthlib", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "google-auth-oauthlib", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "google-auth-oauthlib", marker = "extra == 'google-drive'", specifier = ">=1.0" },
+    { name = "google-api-python-client", specifier = ">=2.80" },
+    { name = "google-auth-httplib2", specifier = ">=0.2" },
+    { name = "google-auth-oauthlib", specifier = ">=1.0" },
     { name = "httpx", specifier = ">=0.24" },
-    { name = "mistralai", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "mistralai", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "mistralai", marker = "extra == 'mistral'", specifier = ">=1.0" },
+    { name = "mistralai", specifier = ">=1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.5" },
     { name = "numpy", specifier = ">=1.24" },
     { name = "onnxruntime", specifier = ">=1.16" },
-    { name = "openai", marker = "extra == 'all'", specifier = ">=1.0" },
-    { name = "openai", marker = "extra == 'dev'", specifier = ">=1.0" },
-    { name = "openai", marker = "extra == 'openai'", specifier = ">=1.0" },
+    { name = "openai", specifier = ">=1.0" },
     { name = "pillow", specifier = ">=10.0" },
     { name = "pydantic", specifier = ">=2.0" },
-    { name = "pydantic-ai", marker = "extra == 'all'", specifier = ">=0.1" },
-    { name = "pydantic-ai", marker = "extra == 'dev'", specifier = ">=0.1" },
-    { name = "pydantic-ai", marker = "extra == 'llm'", specifier = ">=0.1" },
+    { name = "pydantic-ai", specifier = ">=0.1" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21" },
     { name = "python-dotenv", specifier = ">=1.0" },
     { name = "python-ulid", specifier = ">=3.0" },
     { name = "rich", specifier = ">=13.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'all'", specifier = ">=2.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'dev'", specifier = ">=2.0" },
-    { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'store'", specifier = ">=2.0" },
-    { name = "sqlite-vec", marker = "extra == 'all'", specifier = ">=0.1" },
-    { name = "sqlite-vec", marker = "extra == 'dev'", specifier = ">=0.1" },
-    { name = "sqlite-vec", marker = "extra == 'store'", specifier = ">=0.1" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "sqlite-vec", specifier = ">=0.1" },
     { name = "tomli-w", specifier = ">=1.0" },
     { name = "typer", specifier = ">=0.13" },
 ]
-provides-extras = ["all", "anthropic", "dev", "google-drive", "llm", "mistral", "openai", "store"]
+provides-extras = ["dev"]
 
 [[package]]
 name = "boto3"

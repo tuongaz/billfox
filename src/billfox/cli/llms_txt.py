@@ -77,9 +77,9 @@ Options:
 
 Show which integrations are currently authorized.
 
-### `billfox receipt parse <file>`
+### `billfox receipt add <file>`
 
-Parse a receipt into structured data using OCR + LLM. Automatically crops receipts with YOLO object detection and resizes before extraction when no `--preprocess` is specified.
+Add a receipt by parsing it into structured data using OCR + LLM. Automatically crops receipts with YOLO object detection and resizes before extraction when no `--preprocess` is specified.
 
 Arguments:
 - `file` (required) — Path to the receipt file to parse.

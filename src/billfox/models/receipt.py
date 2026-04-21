@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -19,7 +21,7 @@ class Receipt(BaseModel):
     """Structured receipt data extracted from a document."""
 
     expense_number: str | None = None
-    expense_date: str | None = None
+    expense_date: datetime | None = None
     vendor_name: str | None = None
     vendor_business_number: str | None = None
     vendor_email: str | None = None

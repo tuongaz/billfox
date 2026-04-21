@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone, timedelta
+
 from billfox.models.receipt import Receipt, ReceiptItem
 
 
@@ -54,7 +56,7 @@ class TestReceipt:
     def test_all_fields(self) -> None:
         receipt = Receipt(
             expense_number="EXP-001",
-            expense_date="2026-01-15",
+            expense_date=datetime(2026, 1, 15, tzinfo=timezone(timedelta(hours=10))),
             vendor_name="Acme Corp",
             vendor_business_number="ABN 12345678901",
             vendor_email="info@acme.com",

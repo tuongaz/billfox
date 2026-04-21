@@ -12,6 +12,9 @@ from billfox.cli.app import app
 
 runner = CliRunner()
 
+# Timezone prompt: "1\n" selects first option (detected or first common timezone)
+_TZ_INPUT = "1\n"
+
 
 # ---------------------------------------------------------------------------
 # Init wizard: Docling + OpenAI + Local backup
@@ -21,20 +24,22 @@ runner = CliRunner()
 class TestInitDoclingOpenAILocal:
     """Selecting Docling + OpenAI + Local backup writes correct config."""
 
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_writes_correct_config_with_all_nested_keys(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
-        # 1=Docling, 1=OpenAI, 1=OpenAI embedding, 1=Local backup
+        # 1=Docling, 1=OpenAI, 1=OpenAI embedding, 1=Local backup, path, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n1\n1\n1\n{backup_path}\n",
+            input=f"1\n1\n1\n1\n{backup_path}\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
@@ -52,23 +57,27 @@ class TestInitDoclingOpenAILocal:
         # Backup
         assert config["defaults"]["backup"]["provider"] == "local"
         assert config["defaults"]["backup"]["local_path"] == backup_path
+        # Timezone
+        assert config["defaults"]["timezone"] == "Australia/Sydney"
         # No ollama section
         assert "ollama" not in config["defaults"]
 
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_shows_openai_env_var_guidance(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
-        # 1=Docling, 1=OpenAI, 1=OpenAI embedding, 1=Local backup
+        # 1=Docling, 1=OpenAI, 1=OpenAI embedding, 1=Local backup, path, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n1\n1\n1\n{backup_path}\n",
+            input=f"1\n1\n1\n1\n{backup_path}\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
@@ -83,18 +92,20 @@ class TestInitDoclingOpenAILocal:
 class TestInitMistralClaudeGDrive:
     """Selecting Mistral + Claude + Google Drive writes correct config."""
 
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_writes_correct_config(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive
+        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="2\n2\n3\n2\n",
+            input=f"2\n2\n3\n2\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
@@ -109,36 +120,40 @@ class TestInitMistralClaudeGDrive:
         assert "local_path" not in config["defaults"]["backup"]
         assert "ollama" not in config["defaults"]
 
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_shows_mistral_and_anthropic_env_guidance(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive
+        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="2\n2\n3\n2\n",
+            input=f"2\n2\n3\n2\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
         assert "MISTRAL_API_KEY" in result.output
         assert "ANTHROPIC_API_KEY" in result.output
 
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_shows_google_drive_auth_instruction(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive
+        # 2=Mistral, 2=Claude, 3=None embedding, 2=Google Drive, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="2\n2\n3\n2\n",
+            input=f"2\n2\n3\n2\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
@@ -154,21 +169,23 @@ class TestInitOllama:
     """Selecting Ollama triggers base URL prompt and stores ollama config."""
 
     @patch("billfox.cli.init._check_ollama", return_value=None)
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_stores_base_url_and_model(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         mock_check: MagicMock,
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
-        # 1=Docling, 3=Ollama LLM, base_url, model, 3=None embedding, 1=Local backup
+        # 1=Docling, 3=Ollama LLM, base_url, model, 3=None embedding, 1=Local backup, path, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n3\nhttp://myhost:11434\nmymodel\n3\n1\n{backup_path}\n",
+            input=f"1\n3\nhttp://myhost:11434\nmymodel\n3\n1\n{backup_path}\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
@@ -180,21 +197,23 @@ class TestInitOllama:
         assert config["defaults"]["ollama"]["model"] == "mymodel"
 
     @patch("billfox.cli.init._check_ollama", return_value=None)
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_no_api_key_guidance_for_ollama(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         mock_check: MagicMock,
         tmp_path: Path,
     ) -> None:
         backup_path = str(tmp_path / "backups")
-        # 1=Docling, 3=Ollama LLM, base_url, model, 3=None embedding, 1=Local backup
+        # 1=Docling, 3=Ollama LLM, base_url, model, 3=None embedding, 1=Local backup, path, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input=f"1\n3\nhttp://localhost:11434\nllama3.2\n3\n1\n{backup_path}\n",
+            input=f"1\n3\nhttp://localhost:11434\nllama3.2\n3\n1\n{backup_path}\n{_TZ_INPUT}",
         )
 
         assert result.exit_code == 0
@@ -209,9 +228,9 @@ class TestInitOllama:
 class TestInitOverwriteConfirmation:
     """Re-running init with existing config asks for confirmation."""
 
-    @patch("billfox.cli.app._write_config")
+    @patch("billfox.cli._helpers.write_config")
     @patch(
-        "billfox.cli.app._read_config",
+        "billfox.cli._helpers.read_config",
         return_value={"defaults": {"ocr": {"provider": "docling"}}},
     )
     def test_decline_overwrite_cancels_setup(
@@ -225,34 +244,38 @@ class TestInitOverwriteConfirmation:
         assert "Existing configuration found" in result.output
         mock_write.assert_not_called()
 
-    @patch("billfox.cli.app._write_config")
+    @patch("billfox.cli._helpers.write_config")
     @patch(
-        "billfox.cli.app._read_config",
+        "billfox.cli._helpers.read_config",
         return_value={"defaults": {"ocr": {"provider": "docling"}}},
     )
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_confirm_overwrite_proceeds_with_wizard(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # y=overwrite, 1=Docling, 1=OpenAI, 1=OpenAI embedding, 2=Google Drive
-        result = runner.invoke(app, ["init"], input="y\n1\n1\n1\n2\n")
+        # y=overwrite, 1=Docling, 1=OpenAI, 1=OpenAI embedding, 2=Google Drive, 1=timezone
+        result = runner.invoke(app, ["init"], input=f"y\n1\n1\n1\n2\n{_TZ_INPUT}")
 
         assert result.exit_code == 0
         mock_write.assert_called_once()
 
-    @patch("billfox.cli.app._write_config")
+    @patch("billfox.cli._helpers.write_config")
     @patch(
-        "billfox.cli.app._read_config",
+        "billfox.cli._helpers.read_config",
         return_value={"defaults": {"ocr": {"provider": "docling"}}},
     )
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_yes_flag_skips_confirmation(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
     ) -> None:
-        # --yes skips overwrite prompt; 1=Docling, 1=OpenAI, 1=OpenAI embedding, 2=Google Drive
-        result = runner.invoke(app, ["init", "--yes"], input="1\n1\n1\n2\n")
+        # --yes skips overwrite prompt; 1=Docling, 1=OpenAI, 1=OpenAI embedding, 2=Google Drive, 1=timezone
+        result = runner.invoke(app, ["init", "--yes"], input=f"1\n1\n1\n2\n{_TZ_INPUT}")
 
         assert result.exit_code == 0
         mock_write.assert_called_once()
@@ -267,7 +290,7 @@ class TestInitOverwriteConfirmation:
 class TestConfigGuardTriggers:
     """Config guard triggers on extract/parse/backup when config is missing."""
 
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.read_config", return_value={})
     def test_extract_guard_triggers(
         self,
         mock_read: MagicMock,
@@ -281,7 +304,7 @@ class TestConfigGuardTriggers:
         assert result.exit_code == 1
         assert "billfox is not configured" in result.output
 
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.read_config", return_value={})
     def test_parse_guard_triggers(
         self,
         mock_read: MagicMock,
@@ -305,7 +328,7 @@ class TestConfigGuardTriggers:
         assert result.exit_code == 1
         assert "billfox is not configured" in result.output
 
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.read_config", return_value={})
     def test_backup_guard_triggers(
         self,
         mock_read: MagicMock,
@@ -328,7 +351,7 @@ class TestConfigGuardTriggers:
 class TestConfigGuardBypass:
     """Config guard does NOT trigger with explicit --extractor or --model flags."""
 
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.read_config", return_value={})
     def test_extract_bypassed_with_explicit_extractor(
         self,
         mock_read: MagicMock,
@@ -361,7 +384,7 @@ class TestConfigGuardBypass:
         assert result.exit_code == 0
         assert "billfox is not configured" not in result.output
 
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.read_config", return_value={})
     def test_parse_bypassed_with_explicit_model(
         self,
         mock_read: MagicMock,
@@ -400,7 +423,7 @@ class TestConfigGuardBypass:
         assert result.exit_code == 0
         assert "billfox is not configured" not in result.output
 
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.read_config", return_value={})
     def test_parse_bypassed_with_explicit_extractor(
         self,
         mock_read: MagicMock,

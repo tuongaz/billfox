@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import Generic, TypeVar
 
 from pydantic import BaseModel
@@ -165,12 +165,14 @@ class Pipeline(Generic[T]):
     def _extract_document_date(parsed: T) -> date | None:  # type: ignore[type-var]
         """Try to extract a date from the parsed model's expense_date field."""
         raw = getattr(parsed, "expense_date", None)
-        if not isinstance(raw, str):
-            return None
-        try:
-            return date.fromisoformat(raw)
-        except ValueError:
-            return None
+        if isinstance(raw, datetime):
+            return raw.date()
+        if isinstance(raw, str):
+            try:
+                return date.fromisoformat(raw)
+            except ValueError:
+                return None
+        return None
 
     async def _preprocess(self, document: Document) -> Document:
         for preprocessor in self.preprocessors:

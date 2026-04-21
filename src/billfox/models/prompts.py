@@ -55,7 +55,8 @@ non-transactional document), leave ALL fields at their defaults (null/empty).
 
 ## Date Handling
 
-1. Extract the transaction date into `expense_date` in ISO 8601 format: "YYYY-MM-DD".
+1. Extract the transaction date into `expense_date` in ISO 8601 format with timezone
+   offset: "YYYY-MM-DDTHH:MM:SS±HH:MM".
 2. Look for labels like "Date", "Transaction Date", "Invoice Date", "Tax Invoice Date".
 3. If multiple dates appear (e.g. invoice date and due date), prefer the transaction or
    invoice date, not the due date.
@@ -66,6 +67,19 @@ non-transactional document), leave ALL fields at their defaults (null/empty).
    - DD Mon YYYY (e.g. "13 Apr 2026")
 5. Use context (vendor country, currency) to disambiguate DD/MM vs MM/DD when the day
    value is ≤ 12. For Australian vendors, prefer DD/MM/YYYY.
+6. If the receipt has no time, use midnight: "T00:00:00".
+7. Determine the timezone offset from the vendor's country and address:
+   - For single-timezone countries, use the country's offset (e.g. "GB" → "+00:00",
+     "NZ" → "+12:00", "JP" → "+09:00", "SG" → "+08:00").
+   - For multi-timezone countries, use the vendor's state or city:
+     - Australia: NSW/VIC/TAS/ACT → "+10:00", QLD → "+10:00", SA → "+09:30",
+       WA → "+08:00", NT → "+09:30"
+     - US: Eastern → "-05:00", Central → "-06:00", Mountain → "-07:00",
+       Pacific → "-08:00"
+   - Use standard offsets (not daylight saving). If unsure, use the country's most
+     common offset.
+   - If the timezone cannot be determined at all, omit the offset and output just
+     "YYYY-MM-DDTHH:MM:SS" (naive datetime). The system will apply a default.
 
 ## Tax and GST Handling
 

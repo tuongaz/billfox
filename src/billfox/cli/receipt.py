@@ -1,4 +1,4 @@
-"""CLI sub-app for receipt operations: parse, search, list, get, delete, edit."""
+"""CLI sub-app for receipt operations: add, search, list, get, delete, edit."""
 
 from __future__ import annotations
 
@@ -245,16 +245,16 @@ def _apply_item_updates(
 
 receipt_app: Any = typer.Typer(
     name="receipt",
-    help="Parse, search, list, delete and edit receipts.",
+    help="Add, search, list, delete and edit receipts.",
     no_args_is_help=True,
 )
 
 
-# ── parse ────────────────────────────────────────────────────────
+# ── add ──────────────────────────────────────────────────────────
 
 
 @receipt_app.command()  # type: ignore[untyped-decorator]
-def parse(
+def add(
     file: str = typer.Argument(..., help="Path to the receipt file to parse."),
     model: str | None = typer.Option(
         None, "--model", "-m", help="LLM model identifier (reads from config if not set).",
@@ -273,7 +273,7 @@ def parse(
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
-    """Parse a receipt into structured data using OCR + LLM."""
+    """Add a receipt by parsing it into structured data using OCR + LLM."""
     import click as _click
 
     _ctx = _click.get_current_context()

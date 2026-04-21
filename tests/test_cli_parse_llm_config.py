@@ -39,7 +39,7 @@ def _run_receipt(
 
     mock_llm_parser_cls = MagicMock()
 
-    args = ["receipt", "parse", str(img)]
+    args = ["receipt", "add", str(img)]
     if extra_args:
         args.extend(extra_args)
 

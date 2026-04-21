@@ -78,10 +78,12 @@ class TestInitWizardOllamaIntegration:
     """Tests for Ollama connectivity in the full init wizard flow."""
 
     @patch("billfox.cli.init._check_ollama")
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_ollama_with_models_shows_selection(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         mock_check: MagicMock,
@@ -94,11 +96,11 @@ class TestInitWizardOllamaIntegration:
 
         runner = CliRunner()
         # Choices: OCR=1 (Docling), LLM=3 (Ollama), base_url=default,
-        # model selection=2 (codellama:7b), embedding=3 (None), backup=1 (local), backup path=default
+        # model selection=2 (codellama:7b), embedding=3 (None), backup=1 (local), backup path=default, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="1\n3\nhttp://localhost:11434\n2\n3\n1\n\n",
+            input="1\n3\nhttp://localhost:11434\n2\n3\n1\n\n1\n",
         )
 
         assert result.exit_code == 0
@@ -111,10 +113,12 @@ class TestInitWizardOllamaIntegration:
         assert written_config["defaults"]["llm"]["model"] == "ollama:codellama:7b"
 
     @patch("billfox.cli.init._check_ollama")
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_ollama_connection_failure_falls_back_to_prompt(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         mock_check: MagicMock,
@@ -127,11 +131,11 @@ class TestInitWizardOllamaIntegration:
 
         runner = CliRunner()
         # Choices: OCR=1, LLM=3 (Ollama), base_url=default,
-        # manual model name=mymodel, embedding=3 (None), backup=1 (local), backup path=default
+        # manual model name=mymodel, embedding=3 (None), backup=1 (local), backup path=default, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="1\n3\nhttp://localhost:11434\nmymodel\n3\n1\n\n",
+            input="1\n3\nhttp://localhost:11434\nmymodel\n3\n1\n\n1\n",
         )
 
         assert result.exit_code == 0
@@ -142,10 +146,12 @@ class TestInitWizardOllamaIntegration:
         assert written_config["defaults"]["llm"]["model"] == "ollama:mymodel"
 
     @patch("billfox.cli.init._check_ollama")
-    @patch("billfox.cli.app._write_config")
-    @patch("billfox.cli.app._read_config", return_value={})
+    @patch("billfox.cli._helpers.write_config")
+    @patch("billfox.cli._helpers.read_config", return_value={})
+    @patch("billfox.cli._helpers.get_machine_timezone", return_value="Australia/Sydney")
     def test_ollama_empty_models_falls_back_to_prompt(
         self,
+        mock_tz: MagicMock,
         mock_read: MagicMock,
         mock_write: MagicMock,
         mock_check: MagicMock,
@@ -158,11 +164,11 @@ class TestInitWizardOllamaIntegration:
 
         runner = CliRunner()
         # Choices: OCR=1, LLM=3, base_url=default,
-        # manual model=llama3.2 (default), embedding=3 (None), backup=1, backup path=default
+        # manual model=llama3.2 (default), embedding=3 (None), backup=1, backup path=default, 1=timezone
         result = runner.invoke(
             app,
             ["init", "--yes"],
-            input="1\n3\nhttp://localhost:11434\nllama3.2\n3\n1\n\n",
+            input="1\n3\nhttp://localhost:11434\nllama3.2\n3\n1\n\n1\n",
         )
 
         assert result.exit_code == 0

@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import sys
 import tomllib
+from datetime import datetime
 from pathlib import Path
 from typing import Any
+from zoneinfo import ZoneInfo, available_timezones
 
 import typer
 from rich import print as rprint
@@ -222,6 +224,49 @@ def resolve_llm_model(
         base_url = get_nested(config, "defaults.ollama.base_url")
 
     return resolved_model, base_url
+
+
+# ── Timezone helpers ──────────────────────────────────────────
+
+
+def get_machine_timezone() -> str | None:
+    """Detect the machine's IANA timezone, or None if unavailable."""
+    try:
+        tz = datetime.now().astimezone().tzinfo
+        if tz is not None and hasattr(tz, "key"):
+            key = tz.key  # type: ignore[union-attr]
+            if key in available_timezones():
+                return key  # type: ignore[no-any-return]
+    except Exception:
+        pass
+    return None
+
+
+def resolve_timezone_offset(
+    expense_date: datetime | None,
+    config: dict[str, Any],
+) -> datetime | None:
+    """Apply timezone to a naive expense_date using the fallback chain.
+
+    If expense_date already has tzinfo, return as-is.
+    Fallback: config defaults.timezone -> machine timezone.
+    """
+    if expense_date is None:
+        return None
+    if expense_date.tzinfo is not None:
+        return expense_date
+
+    # Try config timezone
+    tz_name = get_nested(config, "defaults.timezone")
+    if isinstance(tz_name, str) and tz_name in available_timezones():
+        return expense_date.replace(tzinfo=ZoneInfo(tz_name))
+
+    # Try machine timezone
+    machine_tz = get_machine_timezone()
+    if machine_tz:
+        return expense_date.replace(tzinfo=ZoneInfo(machine_tz))
+
+    return expense_date
 
 
 # ── Search helpers ─────────────────────────────────────────────
