@@ -184,6 +184,23 @@ def _apply_where(
     return filtered
 
 
+def _sort_search_results(
+    results: list[Any],
+    sort: str,
+    direction: str,
+) -> list[Any]:
+    """Re-sort search results by the specified field."""
+    _key_map: dict[str, Any] = {
+        "expense_date": lambda r: r.data.get("expense_date") or "",
+        "created_at": lambda r: r.data.get("_created_at") or "",
+        "updated_at": lambda r: r.data.get("_updated_at") or "",
+    }
+    key_fn = _key_map.get(sort)
+    if key_fn is None:
+        return results
+    return sorted(results, key=key_fn, reverse=(direction == "desc"))
+
+
 def _apply_item_updates(
     existing_items: list[Any],
     item_patches: dict[int, dict[str, Any]],
@@ -326,6 +343,13 @@ def parse(
             if not parsed.vendor_name and parsed.total is None and not parsed.items:
                 await store_instance.delete(doc_id)
                 return None
+
+            # Apply timezone fallback if expense_date is naive
+            resolved_date = _helpers.resolve_timezone_offset(parsed.expense_date, config)
+            if resolved_date is not None and resolved_date != parsed.expense_date:
+                parsed = parsed.model_copy(update={"expense_date": resolved_date})
+                await store_instance.save(doc_id, parsed)
+
             return parsed
         finally:
             await store_instance.close()
@@ -343,7 +367,7 @@ def parse(
 
     output_text = (
         result.model_dump_json(indent=2) if json_output
-        else json.dumps(result.model_dump(), indent=2)
+        else json.dumps(result.model_dump(), indent=2, default=str)
     )
 
     if output:
@@ -444,6 +468,14 @@ def search(
             " Example: --where 'total>50' --where 'tax_amount<=10'"
         ),
     ),
+    sort: str = typer.Option(
+        "expense_date", "--sort", "-s",
+        help="Sort by: created_at, updated_at, or expense_date.",
+    ),
+    direction: str = typer.Option(
+        "desc", "--direction",
+        help="Sort direction: asc or desc.",
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
@@ -463,6 +495,16 @@ def search(
     if mode not in ("hybrid", "vector", "bm25"):
         raise typer.BadParameter(
             f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
+        )
+
+    _valid_sorts = ("created_at", "updated_at", "expense_date")
+    if sort not in _valid_sorts:
+        raise typer.BadParameter(
+            f"Invalid sort: {sort!r}. Choose from: {', '.join(_valid_sorts)}"
+        )
+    if direction not in ("asc", "desc"):
+        raise typer.BadParameter(
+            f"Invalid direction: {direction!r}. Choose from: asc, desc"
         )
 
     parsed_fields = _parse_fields(fields)
@@ -485,7 +527,9 @@ def search(
                 return await store_instance.search(query, limit=limit, mode=mode)  # type: ignore[no-any-return]
             # --where only: fetch all documents, wrap as SearchResult
             from billfox._types import SearchResult
-            items, _total = await store_instance.list_documents(limit=limit, offset=0)
+            items, _total = await store_instance.list_documents(
+                limit=limit, offset=0, sort=sort, direction=direction,
+            )
             return [
                 SearchResult(
                     document_id=doc_id,
@@ -505,6 +549,7 @@ def search(
         raise typer.Exit(code=1) from None
 
     results = _apply_where(results, where_conditions)
+    results = _sort_search_results(results, sort, direction)
 
     if json_output:
         output_text = json.dumps(
@@ -556,6 +601,14 @@ def list_receipts(
             " Example: --where 'total>50' --where 'tax_amount<=10'"
         ),
     ),
+    sort: str = typer.Option(
+        "expense_date", "--sort", "-s",
+        help="Sort by: created_at, updated_at, or expense_date.",
+    ),
+    direction: str = typer.Option(
+        "desc", "--direction",
+        help="Sort direction: asc or desc.",
+    ),
     json_output: bool = typer.Option(False, "--json", "-j", help="Output machine-readable JSON."),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable debug output."),
 ) -> None:
@@ -567,6 +620,16 @@ def list_receipts(
 
     if page < 1:
         raise typer.BadParameter("Page must be >= 1.")
+
+    _valid_sorts = ("created_at", "updated_at", "expense_date")
+    if sort not in _valid_sorts:
+        raise typer.BadParameter(
+            f"Invalid sort: {sort!r}. Choose from: {', '.join(_valid_sorts)}"
+        )
+    if direction not in ("asc", "desc"):
+        raise typer.BadParameter(
+            f"Invalid direction: {direction!r}. Choose from: asc, desc"
+        )
 
     parsed_fields = _parse_fields(fields)
     where_conditions = _parse_where(where) if where else []
@@ -582,7 +645,9 @@ def list_receipts(
             schema=Receipt,
         )
         try:
-            return await store_instance.list_documents(limit=per_page, offset=offset)  # type: ignore[no-any-return]
+            return await store_instance.list_documents(  # type: ignore[no-any-return]
+                limit=per_page, offset=offset, sort=sort, direction=direction,
+            )
         finally:
             await store_instance.close()
 
@@ -813,7 +878,7 @@ def edit_receipt(
     data: str | None = typer.Option(None, "--data", help="JSON string with fields to update."),
     vendor_name: str | None = typer.Option(None, "--vendor-name", help="Vendor name."),
     total: float | None = typer.Option(None, "--total", help="Total amount."),
-    expense_date: str | None = typer.Option(None, "--expense-date", help="Expense date."),
+    expense_date: str | None = typer.Option(None, "--expense-date", help="Expense date (ISO 8601, e.g. 2025-04-19T00:00:00+10:00)."),
     currency: str | None = typer.Option(None, "--currency", help="Currency code."),
     tax_amount: float | None = typer.Option(None, "--tax-amount", help="Tax amount."),
     tax_rate: float | None = typer.Option(None, "--tax-rate", help="Tax rate."),
@@ -875,7 +940,13 @@ def edit_receipt(
     if total is not None:
         updates["total"] = total
     if expense_date is not None:
-        updates["expense_date"] = expense_date
+        from datetime import datetime as _dt
+
+        try:
+            updates["expense_date"] = _dt.fromisoformat(expense_date)
+        except ValueError:
+            rprint(f"[red]Error:[/red] Invalid date format: {escape(repr(expense_date))}. Use ISO 8601 (e.g. 2025-04-19T00:00:00+10:00).")
+            raise typer.Exit(code=1) from None
     if currency is not None:
         updates["currency"] = currency
     if tax_amount is not None:
@@ -965,7 +1036,7 @@ def edit_receipt(
 
     output_text = (
         result.model_dump_json(indent=2) if json_output
-        else json.dumps(result.model_dump(), indent=2)
+        else json.dumps(result.model_dump(), indent=2, default=str)
     )
     sys.stdout.write(output_text)
     sys.stdout.write("\n")

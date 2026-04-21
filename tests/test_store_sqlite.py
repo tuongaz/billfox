@@ -126,6 +126,63 @@ async def test_list_documents_pagination(store: SQLiteDocumentStore[Invoice]) ->
     assert len(set(all_ids)) == 5
 
 
+async def test_list_documents_sort_created_at_asc(store: SQLiteDocumentStore[Invoice]) -> None:
+    await store.save("a", Invoice(vendor_name="A", total=1.0))
+    await store.save("b", Invoice(vendor_name="B", total=2.0))
+    await store.save("c", Invoice(vendor_name="C", total=3.0))
+
+    items, _ = await store.list_documents(sort="created_at", direction="asc")
+    ids = [doc_id for doc_id, _ in items]
+    assert ids == ["a", "b", "c"]
+
+
+async def test_list_documents_sort_created_at_desc(store: SQLiteDocumentStore[Invoice]) -> None:
+    await store.save("a", Invoice(vendor_name="A", total=1.0))
+    await store.save("b", Invoice(vendor_name="B", total=2.0))
+    await store.save("c", Invoice(vendor_name="C", total=3.0))
+
+    items, _ = await store.list_documents(sort="created_at", direction="desc")
+    ids = [doc_id for doc_id, _ in items]
+    assert ids == ["c", "b", "a"]
+
+
+async def test_list_documents_sort_expense_date() -> None:
+    from billfox.models.receipt import Receipt
+
+    store_r: SQLiteDocumentStore[Receipt] = SQLiteDocumentStore(
+        db_path=":memory:", schema=Receipt,
+    )
+    await store_r.save("old", Receipt(expense_date="2024-01-01T00:00:00", vendor_name="Old"))
+    await store_r.save("new", Receipt(expense_date="2024-06-15T00:00:00", vendor_name="New"))
+    await store_r.save("mid", Receipt(expense_date="2024-03-10T00:00:00", vendor_name="Mid"))
+
+    items_desc, _ = await store_r.list_documents(sort="expense_date", direction="desc")
+    ids_desc = [doc_id for doc_id, _ in items_desc]
+    assert ids_desc == ["new", "mid", "old"]
+
+    items_asc, _ = await store_r.list_documents(sort="expense_date", direction="asc")
+    ids_asc = [doc_id for doc_id, _ in items_asc]
+    assert ids_asc == ["old", "mid", "new"]
+
+
+async def test_list_documents_sort_expense_date_nulls_last() -> None:
+    from billfox.models.receipt import Receipt
+
+    store_r: SQLiteDocumentStore[Receipt] = SQLiteDocumentStore(
+        db_path=":memory:", schema=Receipt,
+    )
+    await store_r.save("nodate", Receipt(vendor_name="NoDate"))
+    await store_r.save("dated", Receipt(expense_date="2024-06-15T00:00:00", vendor_name="Dated"))
+
+    items_desc, _ = await store_r.list_documents(sort="expense_date", direction="desc")
+    ids = [doc_id for doc_id, _ in items_desc]
+    assert ids[-1] == "nodate"
+
+    items_asc, _ = await store_r.list_documents(sort="expense_date", direction="asc")
+    ids_asc = [doc_id for doc_id, _ in items_asc]
+    assert ids_asc[-1] == "nodate"
+
+
 async def test_save_and_get_file_paths(store: SQLiteDocumentStore[Invoice]) -> None:
     inv = Invoice(vendor_name="Acme", total=10.0)
     await store.save("doc-fp", inv)

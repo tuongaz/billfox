@@ -8,7 +8,7 @@ import struct
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
-from sqlalchemy import event, func, select, text
+from sqlalchemy import asc as sa_asc, desc as sa_desc, event, func, select, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -171,10 +171,21 @@ class SQLiteDocumentStore(Generic[T]):
                 return None, None
             return row.file_path, row.original_file_path
 
+    _SORT_COLUMNS = {
+        "created_at": lambda: DocumentRow.created_at,
+        "updated_at": lambda: DocumentRow.updated_at,
+        "expense_date": lambda: func.json_extract(DocumentRow.data_json, "$.expense_date"),
+    }
+
     async def list_documents(
-        self, *, limit: int = 20, offset: int = 0,
+        self,
+        *,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "expense_date",
+        direction: str = "desc",
     ) -> tuple[list[tuple[str, T]], int]:
-        """List documents with pagination, newest first.
+        """List documents with pagination.
 
         Returns ``(items, total_count)`` where each item is
         ``(document_id, parsed_model)``.
@@ -187,10 +198,14 @@ class SQLiteDocumentStore(Generic[T]):
                 )
             ).scalar_one()
 
+            col_expr = self._SORT_COLUMNS.get(sort, self._SORT_COLUMNS["expense_date"])()
+            order_fn = sa_desc if direction == "desc" else sa_asc
+            order_clause = order_fn(col_expr).nulls_last()
+
             rows = (
                 await session.execute(
                     select(DocumentRow)
-                    .order_by(DocumentRow.created_at.desc())
+                    .order_by(order_clause)
                     .limit(limit)
                     .offset(offset)
                 )
@@ -232,10 +247,13 @@ class SQLiteDocumentStore(Generic[T]):
                 if row is None:
                     continue
                 data = self._schema.model_validate_json(row.data_json)
+                data_dict = data.model_dump()
+                data_dict["_created_at"] = row.created_at.isoformat() if row.created_at else None
+                data_dict["_updated_at"] = row.updated_at.isoformat() if row.updated_at else None
                 results.append(
                     SearchResult(
                         document_id=doc_id,
-                        data=data.model_dump(),
+                        data=data_dict,
                         score=signals.get("final_score", 0.0),
                         signals=signals,
                     )

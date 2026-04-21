@@ -451,8 +451,20 @@ class TestSearchConfigHelp:
         assert "--db" in result.output
         assert "--limit" in result.output
         assert "--mode" in result.output
+        assert "--sort" in result.output
+        assert "--direction" in result.output
         # --db should not be marked as required (has a default now)
         assert "receipts.db" in result.output
+
+    def test_search_invalid_sort(self) -> None:
+        result = runner.invoke(app, ["receipt", "search", "test", "--sort", "bad"])
+        assert result.exit_code != 0
+        assert "Invalid sort" in result.output
+
+    def test_search_invalid_direction(self) -> None:
+        result = runner.invoke(app, ["receipt", "search", "test", "--direction", "bad"])
+        assert result.exit_code != 0
+        assert "Invalid direction" in result.output
 
     def test_config_help(self) -> None:
         result = runner.invoke(app, ["config", "--help"])

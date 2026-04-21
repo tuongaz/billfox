@@ -65,6 +65,37 @@ billfox receipt search "uber" -w "total=25.50" -f vendor_name,expense_date
 
 Receipts with missing values for filtered fields are excluded. Conditions apply post-search (text query runs first, then filters).
 
+## Sorting
+
+Both `search` and `list` support `--sort` and `--direction` options. Default: `--sort expense_date --direction desc`.
+
+| Sort field | Description |
+|---|---|
+| `expense_date` | Receipt/transaction date (default) |
+| `created_at` | When receipt was added to database |
+| `updated_at` | When receipt was last modified |
+
+| Direction | Description |
+|---|---|
+| `desc` | Newest first (default) |
+| `asc` | Oldest first |
+
+```bash
+# Oldest receipts first
+billfox receipt list --sort expense_date --direction asc -f vendor_name,expense_date
+
+# Recently added receipts
+billfox receipt list --sort created_at -f vendor_name,expense_date
+
+# Recently modified
+billfox receipt list --sort updated_at -f vendor_name,expense_date
+
+# Search results sorted by date instead of relevance
+billfox receipt search "coffee" --sort expense_date -f vendor_name,total,expense_date
+```
+
+Receipts with null sort field values appear last regardless of direction.
+
 ## Practical Scenarios
 
 ```bash
@@ -79,6 +110,9 @@ billfox receipt search "business" -w "total>100" -f vendor_name,total,expense_da
 
 # "What's my most recent receipt?"
 billfox receipt list --per-page 1 -f vendor_name,total,expense_date
+
+# "What's my oldest receipt?"
+billfox receipt list --per-page 1 --direction asc -f vendor_name,total,expense_date
 
 # "List all receipts from page 3"
 billfox receipt list --page 3 -f vendor_name,total,expense_date
@@ -127,6 +161,9 @@ Parse receipt image/PDF through OCR + LLM and store result.
 | `--page, -p` | Page number (default: 1) |
 | `--per-page, -n` | Results per page (default: 20) |
 | `--fields, -f` | Fields to return |
+| `--sort, -s` | Sort by: `created_at`, `updated_at`, `expense_date` (default: `expense_date`) |
+| `--direction` | Sort direction: `asc` or `desc` (default: `desc`) |
+| `--where, -w` | Numeric filter (repeatable, AND logic) |
 | `--json, -j` | JSON output |
 
 ### `billfox receipt search <query>`
@@ -138,6 +175,8 @@ Parse receipt image/PDF through OCR + LLM and store result.
 | `--mode, -m` | `hybrid`, `vector`, or `bm25` |
 | `--fields, -f` | Fields to return |
 | `--where, -w` | Numeric filter (repeatable, AND logic) |
+| `--sort, -s` | Sort by: `created_at`, `updated_at`, `expense_date` (default: `expense_date`) |
+| `--direction` | Sort direction: `asc` or `desc` (default: `desc`) |
 | `--json, -j` | JSON output |
 
 ### `billfox receipt edit <document_id>`

@@ -363,7 +363,9 @@ class TestReceiptListCommand:
             )
 
         assert result.exit_code == 0
-        mock_store.list_documents.assert_awaited_once_with(limit=10, offset=20)
+        mock_store.list_documents.assert_awaited_once_with(
+            limit=10, offset=20, sort="expense_date", direction="desc",
+        )
 
     def test_list_json_pagination_metadata(self) -> None:
         mock_store = MagicMock()
@@ -388,6 +390,34 @@ class TestReceiptListCommand:
         assert "--per-page" in result.output
         assert "--json" in result.output
         assert "--db" in result.output
+        assert "--sort" in result.output
+        assert "--direction" in result.output
+
+    def test_list_sort_and_direction_passed_to_store(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(return_value=([], 0))
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app,
+                ["receipt", "list", "--db", "/tmp/t.db", "--sort", "created_at", "--direction", "asc"],
+            )
+
+        assert result.exit_code == 0
+        mock_store.list_documents.assert_awaited_once_with(
+            limit=20, offset=0, sort="created_at", direction="asc",
+        )
+
+    def test_list_invalid_sort(self) -> None:
+        result = runner.invoke(app, ["receipt", "list", "--db", "/tmp/t.db", "--sort", "bad"])
+        assert result.exit_code != 0
+        assert "Invalid sort" in result.output
+
+    def test_list_invalid_direction(self) -> None:
+        result = runner.invoke(app, ["receipt", "list", "--db", "/tmp/t.db", "--direction", "bad"])
+        assert result.exit_code != 0
+        assert "Invalid direction" in result.output
 
 
 class TestReceiptListFieldsCommand:
