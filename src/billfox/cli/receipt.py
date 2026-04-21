@@ -190,10 +190,23 @@ def _sort_search_results(
     direction: str,
 ) -> list[Any]:
     """Re-sort search results by the specified field."""
+
+    def _str_key(field: str) -> Any:
+        """Return a sort key that converts values to str for consistent comparison.
+
+        Nulls sort last regardless of direction.
+        """
+        def _key(r: Any) -> tuple[bool, str]:
+            val = r.data.get(field)
+            if val is None:
+                return (True, "")
+            return (False, str(val))
+        return _key
+
     _key_map: dict[str, Any] = {
-        "expense_date": lambda r: r.data.get("expense_date") or "",
-        "created_at": lambda r: r.data.get("_created_at") or "",
-        "updated_at": lambda r: r.data.get("_updated_at") or "",
+        "expense_date": _str_key("expense_date"),
+        "created_at": _str_key("_created_at"),
+        "updated_at": _str_key("_updated_at"),
     }
     key_fn = _key_map.get(sort)
     if key_fn is None:
