@@ -203,10 +203,20 @@ def _sort_search_results(
             return (False, str(val))
         return _key
 
+    def _num_key(field: str) -> Any:
+        """Sort key for numeric fields. Nulls sort last."""
+        def _key(r: Any) -> tuple[bool, float]:
+            val = r.data.get(field)
+            if val is None:
+                return (True, 0.0)
+            return (False, float(val))
+        return _key
+
     _key_map: dict[str, Any] = {
         "expense_date": _str_key("expense_date"),
         "created_at": _str_key("_created_at"),
         "updated_at": _str_key("_updated_at"),
+        "total": _num_key("total"),
     }
     key_fn = _key_map.get(sort)
     if key_fn is None:
@@ -483,7 +493,7 @@ def search(
     ),
     sort: str = typer.Option(
         "expense_date", "--sort", "-s",
-        help="Sort by: created_at, updated_at, or expense_date.",
+        help="Sort by: created_at, updated_at, expense_date, or total.",
     ),
     direction: str = typer.Option(
         "desc", "--direction",
@@ -510,7 +520,7 @@ def search(
             f"Invalid mode: {mode!r}. Choose from: hybrid, vector, bm25"
         )
 
-    _valid_sorts = ("created_at", "updated_at", "expense_date")
+    _valid_sorts = ("created_at", "updated_at", "expense_date", "total")
     if sort not in _valid_sorts:
         raise typer.BadParameter(
             f"Invalid sort: {sort!r}. Choose from: {', '.join(_valid_sorts)}"
@@ -616,7 +626,7 @@ def list_receipts(
     ),
     sort: str = typer.Option(
         "expense_date", "--sort", "-s",
-        help="Sort by: created_at, updated_at, or expense_date.",
+        help="Sort by: created_at, updated_at, expense_date, or total.",
     ),
     direction: str = typer.Option(
         "desc", "--direction",
@@ -634,7 +644,7 @@ def list_receipts(
     if page < 1:
         raise typer.BadParameter("Page must be >= 1.")
 
-    _valid_sorts = ("created_at", "updated_at", "expense_date")
+    _valid_sorts = ("created_at", "updated_at", "expense_date", "total")
     if sort not in _valid_sorts:
         raise typer.BadParameter(
             f"Invalid sort: {sort!r}. Choose from: {', '.join(_valid_sorts)}"

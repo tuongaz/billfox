@@ -74,6 +74,7 @@ Both `search` and `list` support `--sort` and `--direction` options. Default: `-
 | `expense_date` | Receipt/transaction date (default) |
 | `created_at` | When receipt was added to database |
 | `updated_at` | When receipt was last modified |
+| `total` | Receipt total amount |
 
 | Direction | Description |
 |---|---|
@@ -161,7 +162,7 @@ Parse receipt image/PDF through OCR + LLM and store result.
 | `--page, -p` | Page number (default: 1) |
 | `--per-page, -n` | Results per page (default: 20) |
 | `--fields, -f` | Fields to return |
-| `--sort, -s` | Sort by: `created_at`, `updated_at`, `expense_date` (default: `expense_date`) |
+| `--sort, -s` | Sort by: `created_at`, `updated_at`, `expense_date`, `total` (default: `expense_date`) |
 | `--direction` | Sort direction: `asc` or `desc` (default: `desc`) |
 | `--where, -w` | Numeric filter (repeatable, AND logic) |
 | `--json, -j` | JSON output |
@@ -175,7 +176,7 @@ Parse receipt image/PDF through OCR + LLM and store result.
 | `--mode, -m` | `hybrid`, `vector`, or `bm25` |
 | `--fields, -f` | Fields to return |
 | `--where, -w` | Numeric filter (repeatable, AND logic) |
-| `--sort, -s` | Sort by: `created_at`, `updated_at`, `expense_date` (default: `expense_date`) |
+| `--sort, -s` | Sort by: `created_at`, `updated_at`, `expense_date`, `total` (default: `expense_date`) |
 | `--direction` | Sort direction: `asc` or `desc` (default: `desc`) |
 | `--json, -j` | JSON output |
 

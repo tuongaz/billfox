@@ -175,6 +175,7 @@ class SQLiteDocumentStore(Generic[T]):
         "created_at": lambda: DocumentRow.created_at,
         "updated_at": lambda: DocumentRow.updated_at,
         "expense_date": lambda: func.json_extract(DocumentRow.data_json, "$.expense_date"),
+        "total": lambda: func.json_extract(DocumentRow.data_json, "$.total"),
     }
 
     async def list_documents(
