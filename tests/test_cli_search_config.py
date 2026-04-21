@@ -309,6 +309,111 @@ class TestSearchCommand:
         )
         assert result.exit_code != 0
 
+    # ── expense_date filtering ───────────────────────────────────
+
+    def test_search_where_filters_by_expense_date(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"expense_date": "2024-06-15T00:00:00", "total": 100.0}, score=0.9),
+                SearchResult(document_id="d2", data={"expense_date": "2024-01-10T00:00:00", "total": 30.0}, score=0.8),
+                SearchResult(document_id="d3", data={"expense_date": "2024-08-20T00:00:00", "total": 75.0}, score=0.7),
+            ]
+        )
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json", "--where", "expense_date>=2024-06-01"],
+            )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        ids = [r["document_id"] for r in parsed]
+        assert len(parsed) == 2
+        assert "d1" in ids
+        assert "d3" in ids
+
+    def test_search_where_date_range(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"expense_date": "2024-03-15T00:00:00"}, score=0.9),
+                SearchResult(document_id="d2", data={"expense_date": "2024-06-15T00:00:00"}, score=0.8),
+                SearchResult(document_id="d3", data={"expense_date": "2024-09-15T00:00:00"}, score=0.7),
+            ]
+        )
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json",
+                 "--where", "expense_date>=2024-04-01", "--where", "expense_date<2024-08-01"],
+            )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 1
+        assert parsed[0]["document_id"] == "d2"
+
+    def test_search_where_date_combined_with_numeric(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"expense_date": "2024-06-15T00:00:00", "total": 200.0}, score=0.9),
+                SearchResult(document_id="d2", data={"expense_date": "2024-06-20T00:00:00", "total": 30.0}, score=0.8),
+                SearchResult(document_id="d3", data={"expense_date": "2024-01-10T00:00:00", "total": 150.0}, score=0.7),
+            ]
+        )
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json",
+                 "--where", "expense_date>=2024-06-01", "--where", "total>50"],
+            )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 1
+        assert parsed[0]["document_id"] == "d1"
+
+    def test_search_where_date_skips_none(self) -> None:
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.search = AsyncMock(
+            return_value=[
+                SearchResult(document_id="d1", data={"expense_date": "2024-06-15T00:00:00"}, score=0.9),
+                SearchResult(document_id="d2", data={"expense_date": None}, score=0.8),
+                SearchResult(document_id="d3", data={}, score=0.7),
+            ]
+        )
+        with (
+            patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store),
+            patch("billfox.cli._helpers.try_build_embedder", return_value=None),
+        ):
+            result = runner.invoke(
+                app,
+                ["receipt", "search", "q", "--db", "/tmp/t.db", "--json", "--where", "expense_date>=2024-01-01"],
+            )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed) == 1
+        assert parsed[0]["document_id"] == "d1"
+
+    def test_search_where_invalid_date_value(self) -> None:
+        result = runner.invoke(
+            app,
+            ["receipt", "search", "q", "--db", "/tmp/t.db", "--where", "expense_date>notadate"],
+        )
+        assert result.exit_code != 0
+
 
 # ── config commands ─────────────────────────────────────────────
 

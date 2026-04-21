@@ -419,6 +419,64 @@ class TestReceiptListCommand:
         assert result.exit_code != 0
         assert "Invalid direction" in result.output
 
+    # ── expense_date filtering ───────────────────────────────────
+
+    def test_list_where_filters_by_expense_date(self) -> None:
+        from datetime import datetime as dt
+
+        mock_d1 = MagicMock()
+        mock_d1.model_dump.return_value = {
+            "vendor_name": "A", "total": 100.0, "currency": "AUD",
+            "expense_date": dt(2024, 6, 15),
+        }
+        mock_d2 = MagicMock()
+        mock_d2.model_dump.return_value = {
+            "vendor_name": "B", "total": 30.0, "currency": "AUD",
+            "expense_date": dt(2024, 1, 10),
+        }
+
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(
+            return_value=([("doc1", mock_d1), ("doc2", mock_d2)], 2),
+        )
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app,
+                ["receipt", "list", "--db", "/tmp/t.db", "--json",
+                 "--where", "expense_date>=2024-06-01"],
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["items"]) == 1
+        assert parsed["items"][0]["document_id"] == "doc1"
+
+    def test_list_where_date_skips_none(self) -> None:
+        mock_d1 = MagicMock()
+        mock_d1.model_dump.return_value = {
+            "vendor_name": "A", "total": 50.0, "currency": "AUD",
+            "expense_date": None,
+        }
+
+        mock_store = MagicMock()
+        mock_store.close = AsyncMock()
+        mock_store.list_documents = AsyncMock(
+            return_value=([("doc1", mock_d1)], 1),
+        )
+
+        with patch("billfox.store.sqlite.SQLiteDocumentStore", return_value=mock_store):
+            result = runner.invoke(
+                app,
+                ["receipt", "list", "--db", "/tmp/t.db", "--json",
+                 "--where", "expense_date>=2024-01-01"],
+            )
+
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert len(parsed["items"]) == 0
+
 
 class TestReceiptListFieldsCommand:
     """Tests for --fields flag on the receipt list subcommand."""

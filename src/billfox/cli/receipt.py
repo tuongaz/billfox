@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import sys
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -125,6 +126,7 @@ _WHERE_PATTERN = re.compile(
     r"^(\w+)\s*(>=|<=|>|<|=)\s*(.+)$"
 )
 _NUMERIC_FIELDS = {"total", "tax_amount", "surcharge_amount", "tax_rate"}
+_DATE_FIELDS = {"expense_date"}
 _OPS: dict[str, Any] = {
     "=": operator.eq,
     ">": operator.gt,
@@ -134,38 +136,56 @@ _OPS: dict[str, Any] = {
 }
 
 
-def _parse_where(conditions: list[str]) -> list[tuple[str, Any, float]]:
-    """Parse ``--where`` conditions like ``total>50``.
+def _to_date(val: Any) -> date:
+    """Coerce a value to ``datetime.date`` for day-level comparison."""
+    if isinstance(val, datetime):
+        return val.date()
+    if isinstance(val, date):
+        return val
+    return datetime.fromisoformat(str(val)).date()
+
+
+def _parse_where(conditions: list[str]) -> list[tuple[str, Any, float | date]]:
+    """Parse ``--where`` conditions like ``total>50`` or ``expense_date>=2024-01-01``.
 
     Returns list of ``(field, op_func, value)`` tuples.
     """
-    parsed: list[tuple[str, Any, float]] = []
+    parsed: list[tuple[str, Any, float | date]] = []
+    _filterable = _NUMERIC_FIELDS | _DATE_FIELDS
     for cond in conditions:
         m = _WHERE_PATTERN.match(cond.strip())
         if not m:
             raise typer.BadParameter(
                 f"Invalid condition: {cond!r}. "
-                f"Use FIELD OPERATOR VALUE (e.g. total>50, tax_amount<=10)."
+                f"Use FIELD OPERATOR VALUE (e.g. total>50, expense_date>=2024-01-01)."
             )
         field, op_str, val_str = m.group(1), m.group(2), m.group(3)
-        if field not in _NUMERIC_FIELDS:
+        if field not in _filterable:
             raise typer.BadParameter(
                 f"Cannot filter on {field!r}. "
-                f"Supported: {', '.join(sorted(_NUMERIC_FIELDS))}."
+                f"Supported: {', '.join(sorted(_filterable))}."
             )
-        try:
-            value = float(val_str)
-        except ValueError:
-            raise typer.BadParameter(
-                f"Invalid number in condition: {val_str!r}."
-            ) from None
+        if field in _DATE_FIELDS:
+            try:
+                value: float | date = _to_date(val_str)
+            except ValueError:
+                raise typer.BadParameter(
+                    f"Invalid date in condition: {val_str!r}. Use YYYY-MM-DD format."
+                ) from None
+        else:
+            try:
+                value = float(val_str)
+            except ValueError:
+                raise typer.BadParameter(
+                    f"Invalid number in condition: {val_str!r}."
+                ) from None
         parsed.append((field, _OPS[op_str], value))
     return parsed
 
 
 def _apply_where(
     results: list[Any],
-    conditions: list[tuple[str, Any, float]],
+    conditions: list[tuple[str, Any, float | date]],
 ) -> list[Any]:
     """Filter results by ``--where`` conditions (AND logic)."""
     if not conditions:
@@ -176,7 +196,18 @@ def _apply_where(
         match = True
         for field, op_func, value in conditions:
             field_val = data.get(field)
-            if field_val is None or not op_func(float(field_val), value):
+            if field_val is None:
+                match = False
+                break
+            try:
+                if isinstance(value, date):
+                    compare_val = _to_date(field_val)
+                else:
+                    compare_val = float(field_val)
+            except (ValueError, TypeError):
+                match = False
+                break
+            if not op_func(compare_val, value):
                 match = False
                 break
         if match:
@@ -485,10 +516,10 @@ def search(
     where: list[str] | None = typer.Option(
         None, "--where", "-w",
         help=(
-            "Filter by numeric condition. Repeatable."
+            "Filter condition. Repeatable."
             " Operators: =, >, <, >=, <=."
-            " Fields: total, tax_amount, surcharge_amount, tax_rate."
-            " Example: --where 'total>50' --where 'tax_amount<=10'"
+            " Fields: total, tax_amount, surcharge_amount, tax_rate, expense_date."
+            " Example: --where 'total>50' --where 'expense_date>=2024-01-01'"
         ),
     ),
     sort: str = typer.Option(
@@ -618,10 +649,10 @@ def list_receipts(
     where: list[str] | None = typer.Option(
         None, "--where", "-w",
         help=(
-            "Filter by numeric condition. Repeatable."
+            "Filter condition. Repeatable."
             " Operators: =, >, <, >=, <=."
-            " Fields: total, tax_amount, surcharge_amount, tax_rate."
-            " Example: --where 'total>50' --where 'tax_amount<=10'"
+            " Fields: total, tax_amount, surcharge_amount, tax_rate, expense_date."
+            " Example: --where 'total>50' --where 'expense_date>=2024-01-01'"
         ),
     ),
     sort: str = typer.Option(
@@ -689,7 +720,18 @@ def list_receipts(
             match = True
             for field, op_func, value in where_conditions:
                 field_val = data.get(field)
-                if field_val is None or not op_func(float(field_val), value):
+                if field_val is None:
+                    match = False
+                    break
+                try:
+                    if isinstance(value, date):
+                        compare_val = _to_date(field_val)
+                    else:
+                        compare_val = float(field_val)
+                except (ValueError, TypeError):
+                    match = False
+                    break
+                if not op_func(compare_val, value):
                     match = False
                     break
             if match:

@@ -106,7 +106,9 @@ Options:
 - `--limit, -l` — Maximum number of results (default: 20).
 - `--mode, -m` — Search mode: `hybrid` (default), `vector`, or `bm25`.
 - `--fields, -f` — Comma-separated fields to include in output. Supports top-level fields (e.g. `vendor_name,total`) and nested item fields with dot notation (e.g. `items.description,items.total`). Use `items` for full item objects. When monetary fields (total, tax_amount, surcharge_amount) or item monetary fields (items.total, items.tax_amount) are requested, currency is auto-included.
-- `--where, -w` — Filter results by numeric condition. Repeatable (AND logic). Operators: `=`, `>`, `<`, `>=`, `<=`. Supported fields: `total`, `tax_amount`, `surcharge_amount`, `tax_rate`. Examples: `--where 'total>50'`, `--where 'total>=100' --where 'tax_amount<=10'`.
+- `--where, -w` — Filter condition. Repeatable (AND logic). Operators: `=`, `>`, `<`, `>=`, `<=`. Supported fields: `total`, `tax_amount`, `surcharge_amount`, `tax_rate`, `expense_date`. Numeric examples: `--where 'total>50'`, `--where 'total>=100' --where 'tax_amount<=10'`. Date examples: `--where 'expense_date>=2024-01-01'`, `--where 'expense_date>=2024-06-01' --where 'expense_date<2024-07-01'`.
+- `--sort, -s` — Sort by: `expense_date` (default), `created_at`, `updated_at`, or `total`.
+- `--direction` — Sort direction: `desc` (default) or `asc`.
 - `--json, -j` — Output machine-readable JSON.
 - `--verbose, -v` — Enable debug output.
 
@@ -119,6 +121,9 @@ Options:
 - `--page, -p` — Page number, starts at 1 (default: 1).
 - `--per-page, -n` — Items per page (default: 20).
 - `--fields, -f` — Comma-separated fields to include in output. Supports top-level fields (e.g. `vendor_name,total`) and nested item fields with dot notation (e.g. `items.description,items.total`). Use `items` for full item objects. When monetary fields (total, tax_amount, surcharge_amount) or item monetary fields (items.total, items.tax_amount) are requested, currency is auto-included.
+- `--where, -w` — Filter condition. Repeatable (AND logic). Operators: `=`, `>`, `<`, `>=`, `<=`. Supported fields: `total`, `tax_amount`, `surcharge_amount`, `tax_rate`, `expense_date`. Numeric examples: `--where 'total>50'`. Date examples: `--where 'expense_date>=2024-01-01'`.
+- `--sort, -s` — Sort by: `expense_date` (default), `created_at`, `updated_at`, or `total`.
+- `--direction` — Sort direction: `desc` (default) or `asc`.
 - `--json, -j` — Output machine-readable JSON.
 - `--verbose, -v` — Enable debug output.
 
